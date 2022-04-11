@@ -7,4 +7,4 @@
  ;  (flags (:standard --source-map-inline)))
  (libraries
   brr
-  query_protocol))
+  merlin.query_protocol))

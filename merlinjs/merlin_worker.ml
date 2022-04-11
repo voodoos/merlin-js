@@ -1,6 +1,7 @@
 open Merlin_utils
 open Brr
 open Std
+open Merlin_kernel
 
 (* Load the CMIs into the pseudo file-system *)
 (* This add roughly 3mo to the final script. These could be loaded dynamically
