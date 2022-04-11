@@ -1,0 +1,25 @@
+opam-version: "2.0"
+maintainer:   "thevoodoos@gmail.com"
+authors:      "Ulysse Gérard"
+homepage:     "https://github.com/voodoos/merlin-js"
+bug-reports:  "https://github.com/voodoos/merlin-js/issues"
+dev-repo:     "git+https://github.com/voodoos/merlin-js.git"
+license:      "MIT"
+build: [
+  ["dune" "subst"] {dev}
+  ["dune" "build" "-p" name "-j" jobs]
+  ["dune" "runtest" "-p" "merlin,dot-merlin-reader" "-j" "1"] {with-test}
+]
+depends: [
+  "ocaml" {>= "4.14" & < "5.00"}
+  "dune" {>= "2.9.0"}
+  "merlin" {>= "4.6"}
+  "yojson" {>= "1.6.0"}
+  "js_of_ocaml" {>= "4.0.0"}
+  "brr" {>= "0.0.3"}
+  "ppx_blob" {>= "0.7.2"}
+]
+synopsis:
+  "Editor helper, provides completion, typing and source browsing for the web"
+description:
+  "Merlin is an assistant for editing OCaml code. It aims to provide the features available in modern browsers: error reporting, auto completion, source browsing and much more."
