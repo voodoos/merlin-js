@@ -3,14 +3,17 @@
  (promote (until-clean))
  (modes js)
  (js_of_ocaml
-  (javascript_files stubs.js))
- ; (flags (:standard --source-map-inline)))
+  (javascript_files stubs.js)
+  (flags (:standard  --debug-info --source-map-inline)))
+  ;(flags (:standard --no-inline --debug-info --pretty --source-map-inline)))
  (libraries
   static_files
+  protocol
   merlin.kernel
   merlin.utils
   merlin.query_protocol
   merlin.query_commands
+  merlin.ocaml_parsing
 
   brr
   js_of_ocaml))

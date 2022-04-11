@@ -2,6 +2,7 @@ open Merlin_utils
 open Brr
 open Std
 open Merlin_kernel
+module Location = Ocaml_parsing.Location
 
 (* Load the CMIs into the pseudo file-system *)
 (* This add roughly 3mo to the final script. These could be loaded dynamically
@@ -22,10 +23,9 @@ let make_pipeline source =
 
 let dispatch source query  =
   let pipeline = make_pipeline source in
-  Mpipeline.with_pipeline pipeline @@ fun () ->
+  Mpipeline.with_pipeline pipeline @@ fun () -> (
     Query_commands.dispatch pipeline query
-    |> Query_json.json_of_response query
-    |> Json.to_string
+  )
 
 
 module Completion = struct
@@ -113,20 +113,20 @@ module Completion = struct
         reconstructed_prefix
 
 
-let at_pos source position =
-  let prefix = prefix_of_position source position in
-  let `Offset to_ = Msource.get_offset source position in
-  let from =
-    to_ - String.length (prefix_of_position ~short_path:true source position)
-  in
-
-  Console.(log ["Prefix:";prefix]);
-  if prefix = "" then
-    None
-  else
-    let query = Query_protocol.Complete_prefix (prefix, position, [], true, true)
+  let at_pos source position =
+    let prefix = prefix_of_position source position in
+    let `Offset to_ = Msource.get_offset source position in
+    let from =
+      to_ - String.length (prefix_of_position ~short_path:true source position)
     in
-    Some (from, to_, dispatch source query)
+
+    Console.(log ["Prefix:";prefix]);
+    if prefix = "" then
+      None
+    else
+      let query = Query_protocol.Complete_prefix (prefix, position, [], true, true)
+      in
+      Some (from, to_, dispatch source query)
 end
 
 let dump () =
@@ -145,38 +145,63 @@ type action = Completion | Type_enclosing | Errors
 [@@ocaml.warning "-37"]
 
 let on_message e =
-  let (action, data, cursor_offset) as m = Brr_io.Message.Ev.data e in
-  Console.(log ["Received message:"; m]);
-  let source = Msource.make data in
-  let position = `Offset cursor_offset in
+  let marshaled_message = Brr_io.Message.Ev.data e in
+  let action : Protocol.action =
+    Marshal.from_bytes marshaled_message 0
+  in
+  Console.(log ["w: Received message:"; action]);
   let res =
     match action with
-    | Completion -> begin
-      match Completion.at_pos source position with
-      | None ->
-        Jv.obj [| ("from", Jv.of_int 0); ("to", Jv.of_int 0); ("entries", Jv.Jarray.create 0) |]
+    | Complete_prefix (source, position) ->
+      let source = Msource.make source in
+      begin match Completion.at_pos source position with
       | Some (from, to_, compl) ->
-        let entries = Brr.Json.decode @@ Jstr.of_string compl
-          |> Stdlib.Result.get_ok in
-        Jv.obj [| ("from", Jv.of_int from); ("to", Jv.of_int to_); ("entries", Jv.get entries "entries") |] end
-    | Type_enclosing ->
+        let entries = compl.entries in
+        Protocol.Completions { from; to_; entries; }
+      | None ->
+        Protocol.Completions { from = 0; to_ = 0; entries = []; }
+      end
+
+    (*
+    | Type_enclosing -> failwith "toto"
       let query = Query_protocol.Type_enclosing (None, position, None) in
       let result_string = dispatch source query in
       Brr.Json.decode @@ Jstr.of_string result_string
-          |> Stdlib.Result.get_ok
-    | Errors ->
-      let query = Query_protocol.Errors {
-          lexing = true;
-          parsing = true;
-          typing = true;
-        }
-      in
-      let result_string = dispatch source query in
-      Brr.Json.decode @@ Jstr.of_string result_string
-          |> Stdlib.Result.get_ok
+          |> Stdlib.Result.get_ok *)
+    | Protocol.All_errors source ->
+        Console.(log ["w: Query errors"]);
+        let source = Msource.make source in
+        let query = Query_protocol.Errors {
+            lexing = true;
+            parsing = true;
+            typing = true;
+          }
+        in
+        let errors =
+          dispatch source query
+          |> List.map ~f:(fun (Location.{kind; main; sub; source} as error) ->
+            let of_sub sub =
+                Location.print_sub_msg Format.str_formatter sub;
+                String.trim (Format.flush_str_formatter ())
+            in
+            let loc = Location.loc_of_report error in
+            let main =
+              Format.asprintf "@[%a@]" Location.print_main error |> String.trim
+            in
+            Protocol.{
+              kind;
+              loc;
+              main;
+              sub = List.map ~f:of_sub sub;
+              source;
+          })
+        in
+        Protocol.Errors errors
+    | _ -> failwith "not implemented"
   in
+  let res = Marshal.to_bytes res [] in
   Brr_webworkers.Worker.G.post res
 
 let () = Jv.(set global "onmessage" @@ Jv.repr on_message)
 
-let () = Console.(log [dump (); dump_config ()])
+(* let () = Console.(log [dump (); dump_config ()]) *)

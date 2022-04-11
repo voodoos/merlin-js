@@ -9,4 +9,5 @@
   merlin_client
   code-mirror
   code-mirror.lint
+  code-mirror.autocomplete
   ))

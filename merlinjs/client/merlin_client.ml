@@ -1,4 +1,5 @@
 open Brr
+module Json = Yojson.Basic
 module Worker = Brr_webworkers.Worker
 
 (* When a query is sent to the Worker we keep the Future result in an indexed
@@ -7,7 +8,7 @@ the answer is posted by the Worker.
 The Worker works synchronously so we expect answer to arrive in order. *)
 type worker = {
   worker: Worker.t;
-  queue: (Jv.t -> unit) Queue.t
+  queue: (Protocol.answer -> unit) Queue.t
 }
 
 let add_fut worker res = Queue.add res worker.queue
@@ -19,7 +20,8 @@ let make_worker url =
   let worker = { worker; queue } in
   let on_message m =
     let m = Ev.as_type m in
-    let data = Brr_io.Message.Ev.data m in
+    let data_marshaled : bytes = Brr_io.Message.Ev.data m in
+    let data : Protocol.answer = Marshal.from_bytes data_marshaled 0 in
     res_fut worker data
   in
   Ev.listen Brr_io.Message.Ev.message on_message @@
@@ -29,36 +31,28 @@ let make_worker url =
 (* todo share that with worker *)
 type action = Completion | Type_enclosing | Errors
 
-let query ~action worker source cursor_offset ((*todo: other queries*)) =
-  let open Fut.Syntax in
+type errors = Protocol.error list
+
+let query ~action worker (*todo: other queries*) =
   let fut, set  = Fut.create () in
   add_fut worker set;
-  Worker.post worker.worker (action, source, cursor_offset);
-  let+ data : Jv.t = fut in
-  Console.(log ["Received:"; data]);
-  (* El.(set_prop p_innerHTML (Jstr.of_string data) results_div); *)
-  data
-
-(* let query_to_js ~action worker source cursor_offset =
-  let source = Jv.to_string source in
-  Fut.to_promise ~ok:Fun.id @@
-    query ~action worker source cursor_offset ()
-
-let make_worker () = make_worker "merlin_worker.bc.js"
-let () = Jv.set Jv.global "make_worker" (Jv.repr make_worker)
-
-let query_completion worker source cursor_offset =
-  query_to_js ~action:Completion worker source cursor_offset
-
-let query_type_enclosing worker source cursor_offset =
-  query_to_js ~action:Type_enclosing worker source cursor_offset *)
+  Worker.post worker.worker (Marshal.to_bytes action []);
+  fut
 
 let query_errors worker (source : string) =
-  query ~action:Errors worker source `Start ()
+  let open Fut.Syntax in
+  let action = Protocol.All_errors source in
+  let+ data : Protocol.answer = query ~action worker in
+  Console.(log ["Received errors:";  data]);
+  match data with
+  | Protocol.Errors errors -> errors
+  | _ -> assert false
 
-(* let () = Jv.set Jv.global "query_worker_completion" @@
-  Jv.repr query_completion
-let () = Jv.set Jv.global "query_worker_type_enclosing" @@
-  Jv.repr query_type_enclosing
-  let () = Jv.set Jv.global "query_worker_errors" @@
-  Jv.repr query_errors *)
+let query_completions worker (source : string) position =
+  let open Fut.Syntax in
+  let action = Protocol.Complete_prefix (source, position) in
+  let+ data : Protocol.answer = query ~action worker in
+  Console.(log ["Received completions:";  data]);
+  match data with
+  | Protocol.Completions compl -> compl
+  | _ -> assert false

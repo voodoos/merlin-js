@@ -6,4 +6,5 @@
  ; (js_of_ocaml
  ;  (flags (:standard --source-map-inline)))
  (libraries
+  protocol
   brr))
