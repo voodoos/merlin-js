@@ -1,0 +1,6 @@
+(library
+ (name protocol)
+ (libraries
+  merlin.ocaml_parsing
+  merlin.query_protocol
+  merlin.kernel))
