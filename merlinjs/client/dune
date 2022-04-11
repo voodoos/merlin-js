@@ -6,5 +6,4 @@
  ; (js_of_ocaml
  ;  (flags (:standard --source-map-inline)))
  (libraries
-  brr
-  merlin.query_protocol))
+  brr))
