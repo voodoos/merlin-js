@@ -32,6 +32,35 @@ let linter : (Editor.View.t -> Lint.Diagnostic.t array Fut.t) = fun view ->
     ) result
   |> Array.of_list
 
+  let keywords = List.map
+    (fun label -> Autocomplete.Completion.create ~label ~type_:"keyword" ())
+    [
+      "as"; "do"; "else"; "end"; "exception"; "fun"; "functor"; "if"; "in";
+      "include"; "let"; "of"; "open"; "rec"; "struct"; "then"; "type"; "val";
+      "while"; "with"; "and"; "assert"; "begin"; "class"; "constraint";
+      "done"; "downto"; "external"; "function"; "initializer"; "lazy";
+      "match"; "method"; "module"; "mutable"; "new"; "nonrec"; "object";
+      "private"; "sig"; "to"; "try"; "value"; "virtual"; "when";
+    ]
+
+let merlin_completion : Autocomplete.Context.t -> Autocomplete.Result.t option Fut.t = fun ctx ->
+  let open Fut.Syntax in
+  let source = get_full_doc @@ Autocomplete.Context.state ctx in
+  let pos = Autocomplete.Context.pos ctx in
+  let+ { from; to_; entries } =
+    Merlin_client.query_completions worker source (`Offset pos)
+  in
+  let options = List.map (fun Query_protocol.Compl.{ name; desc; _ } ->
+    Autocomplete.Completion.create ~label:name ~detail:desc ()
+  ) entries in
+  Some (Autocomplete.Result.create ~from ~to_ ~options ())
+
+let autocomplete =
+  let config = Autocomplete.(config ()
+    ~override:[Source.create merlin_completion; complete_from_list keywords])
+  in
+  Autocomplete.create ~config ()
+
 let init ?doc ?(exts = [||]) () =
   let open Editor in
   let config =
@@ -44,4 +73,4 @@ let init ?doc ?(exts = [||]) () =
   let view : View.t = View.create ~opts () in
   (state, view)
 
-let _editor = init ~exts:[| Lint.create linter |] ()
+let _editor = init ~exts:[| Lint.create linter; autocomplete |] ()
