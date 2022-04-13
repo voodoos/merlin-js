@@ -1,0 +1,31 @@
+{
+    "name": "app",
+    "version": "0.0.1",
+    "license": "MIT",
+    "browser": {
+        "fs": false,
+        "constants": false,
+        "child_process": false,
+        "tty": false
+    },
+    "scripts": {
+        "bundle": "npx browserify --standalone CodeMirror --no-browser-field ./vendor/code-mirror.js -o ./vendor/code-mirror.compiled.js",
+        "translate": "babel vendor --out-dir vendor/out"
+    },
+    "dependencies": {
+        "@codemirror/autocomplete": "0.19.12",
+        "@codemirror/basic-setup": "0.19.0",
+        "@codemirror/legacy-modes": "0.19.0",
+        "@codemirror/lint": "0.19.3",
+        "@codemirror/state": "0.19.5",
+        "@codemirror/stream-parser": "0.19.2",
+        "@codemirror/theme-one-dark": "0.19.1",
+        "@codemirror/view": "0.19.16"
+    },
+    "devDependencies": {
+        "@babel/cli": "^7.16.8",
+        "@babel/core": "^7.16.12",
+        "@babel/plugin-transform-property-mutators": "^7.16.7",
+        "@babel/preset-env": "^7.16.11"
+    }
+}

@@ -1,0 +1,10 @@
+(executable
+ (name index)
+ (modes js)
+ (js_of_ocaml
+  (javascript_files basic.js))
+ (libraries code-mirror))
+
+(alias
+ (name default)
+ (deps index.html))
