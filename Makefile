@@ -1,10 +1,7 @@
-node:
-	cd merlinjs && yarn
+js:
+	dune build @all-js --profile=release
 
-js: node
-	dune build merlinjs/index.js --profile=release
+js-dev:
+	dune build @all-js --watch --terminal-persistence=clear-on-rebuild
 
-js-dev: node
-	dune build merlinjs/index.js --profile=release --watch
-
-.PHONY: js-dev js node
+.PHONY: js-dev js

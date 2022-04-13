@@ -8,12 +8,11 @@ license:      "MIT"
 build: [
   ["dune" "subst"] {dev}
   ["dune" "build" "-p" name "-j" jobs]
-  ["dune" "runtest" "-p" "merlin,dot-merlin-reader" "-j" "1"] {with-test}
 ]
 depends: [
   "ocaml" {>= "4.14" & < "5.00"}
   "dune" {>= "2.9.0"}
-  "merlin" {>= "4.6"}
+  "merlin-lib" {>= "dev"}
   "yojson" {>= "1.6.0"}
   "js_of_ocaml" {>= "4.0.0"}
   "brr" {>= "0.0.3"}

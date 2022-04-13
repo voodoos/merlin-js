@@ -128,21 +128,16 @@ module Completion = struct
       in
       Some (from, to_, dispatch source query)
 end
-
+(*
 let dump () =
   let query = Query_protocol.Dump [`String "paths"] in
-  dispatch (Msource.make "") query
+  dispatch (Msource.make "") query *)
 
-let dump_config () =
+(* let dump_config () =
   let pipeline = make_pipeline (Msource.make "") in
   Mpipeline.with_pipeline pipeline @@ fun () ->
     Mconfig.dump (Mpipeline.final_config pipeline)
-    |> Json.pretty_to_string
-
-
-(* todo share that with worker *)
-type action = Completion | Type_enclosing | Errors
-[@@ocaml.warning "-37"]
+    |> Json.pretty_to_string *)
 
 let on_message e =
   let marshaled_message = Brr_io.Message.Ev.data e in
@@ -179,7 +174,7 @@ let on_message e =
         in
         let errors =
           dispatch source query
-          |> List.map ~f:(fun (Location.{kind; main; sub; source} as error) ->
+          |> List.map ~f:(fun (Location.{kind; main=_ ; sub; source} as error) ->
             let of_sub sub =
                 Location.print_sub_msg Format.str_formatter sub;
                 String.trim (Format.flush_str_formatter ())

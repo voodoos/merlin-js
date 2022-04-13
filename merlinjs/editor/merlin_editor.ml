@@ -1,6 +1,5 @@
 open Code_mirror
 open Brr
-module Json = Yojson.Basic
 
 let basic_setup = Jv.get Jv.global "__CM__basic_setup" |> Extension.of_jv
 
@@ -57,7 +56,7 @@ let merlin_completion : Autocomplete.Context.t -> Autocomplete.Result.t option F
 
 let autocomplete =
   let config = Autocomplete.(config ()
-    ~override:[Source.create merlin_completion; complete_from_list keywords])
+    ~override:[Source.create merlin_completion; Source.from_list keywords])
   in
   Autocomplete.create ~config ()
 

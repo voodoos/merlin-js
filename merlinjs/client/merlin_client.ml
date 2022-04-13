@@ -1,5 +1,4 @@
 open Brr
-module Json = Yojson.Basic
 module Worker = Brr_webworkers.Worker
 
 (* When a query is sent to the Worker we keep the Future result in an indexed
