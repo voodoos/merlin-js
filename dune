@@ -1,38 +1,19 @@
-(env
- (_ (js_of_ocaml (compilation_mode whole_program))))
-
 (executable
- (name merlin_worker)
- (promote (until-clean))
+ (name app)
  (modes js)
- (js_of_ocaml
-  (javascript_files stubs.js))
+ (promote)
  (libraries
-  static_files
-  protocol
-  merlin-lib.kernel
-  merlin-lib.utils
-  merlin-lib.query_protocol
-  merlin-lib.query_commands
-  merlin-lib.ocaml_parsing
+  merlin_client
+  code-mirror
+  merlin-js.code-mirror))
 
-  brr
-  js_of_ocaml))
 
- (rule
-  (deps
-   merlin_worker.bc.js
-   client/merlin_client.bc.js
-   index.jsx
-   package.json
-   yarn.lock
-   (source_tree node_modules))
-  (targets index.js)
-  (mode (promote (until-clean)))
-  (action (run yarn build)))
+(copy_files
+ (mode promote)
+ (files ../worker/merlin_worker.bc.js))
 
 (alias
  (name all-js)
  (deps
    merlin_worker.bc.js
-   editor/merlin_editor.bc.js))
+   app.bc.js))
