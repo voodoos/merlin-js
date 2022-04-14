@@ -60,6 +60,28 @@ let autocomplete =
   in
   Autocomplete.create ~config ()
 
+let tooltip_on_hover =
+  let open Tooltip in
+  hover_tooltip
+  (fun ~view ~pos ~side:_ ->
+    let open Fut.Syntax in
+    let doc = get_full_doc @@ Editor.View.state view in
+    let pos = `Offset pos in
+    let+ result = Merlin_client.query_type worker doc pos in
+    match result with
+    | (loc, `String type_, _)::_ ->
+      let create _view =
+        let dom = El.div [El.txt' type_] in
+        Tooltip_view.create ~dom ()
+      in
+      let pos = loc.loc_start.pos_cnum in
+      let end_ = loc.loc_end.pos_cnum in
+      Some (Tooltip.create ~pos ~end_ ~above:true ~arrow:true ~create ())
+    | _ -> None)
+
+let ocaml = Jv.get Jv.global "__CM__mllike" |> Stream.Language.of_jv
+let ocaml = Stream.Language.define ocaml
+
 let init ?doc ?(exts = [||]) () =
   let open Editor in
   let config =
@@ -72,4 +94,4 @@ let init ?doc ?(exts = [||]) () =
   let view : View.t = View.create ~opts () in
   (state, view)
 
-let _editor = init ~exts:[| Lint.create linter; autocomplete |] ()
+let _editor = init ~exts:[| ocaml; Lint.create linter; autocomplete; tooltip_on_hover |] ()
