@@ -12,11 +12,14 @@ build: [
 depends: [
   "ocaml" {>= "4.14" & < "5.00"}
   "dune" {>= "2.9.0"}
-  "merlin-lib" {>= "dev"}
+  "merlin-lib"
   "yojson" {>= "1.6.0"}
   "js_of_ocaml" {>= "4.0.0"}
   "brr" {>= "0.0.3"}
   "ppx_blob" {>= "0.7.2"}
+]
+pin-depends: [
+  ["merlin-lib.dev" "git+https://github.com/voodoos/merlin#merlin-lib"]
 ]
 synopsis:
   "Editor helper, provides completion, typing and source browsing for the web"
