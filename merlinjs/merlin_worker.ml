@@ -156,13 +156,10 @@ let on_message e =
       | None ->
         Protocol.Completions { from = 0; to_ = 0; entries = []; }
       end
-
-    (*
-    | Type_enclosing -> failwith "toto"
+    | Type_enclosing (source, position) ->
+      let source = Msource.make source in
       let query = Query_protocol.Type_enclosing (None, position, None) in
-      let result_string = dispatch source query in
-      Brr.Json.decode @@ Jstr.of_string result_string
-          |> Stdlib.Result.get_ok *)
+      Protocol.Typed_enclosings (dispatch source query)
     | Protocol.All_errors source ->
         Console.(log ["w: Query errors"]);
         let source = Msource.make source in
@@ -192,7 +189,6 @@ let on_message e =
           })
         in
         Protocol.Errors errors
-    | _ -> failwith "not implemented"
   in
   let res = Marshal.to_bytes res [] in
   Brr_webworkers.Worker.G.post res
