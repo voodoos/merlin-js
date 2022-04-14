@@ -1,0 +1,8 @@
+(library
+ (name tooltip)
+ (public_name code-mirror.tooltip)
+ (js_of_ocaml
+  (javascript_files bundle.js))
+ (libraries code-mirror))
+
+(include ../../bundle-for-jsoo.dune.inc)
