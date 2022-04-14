@@ -19,20 +19,14 @@
   brr
   js_of_ocaml))
 
- (rule
-  (deps
-   merlin_worker.bc.js
-   client/merlin_client.bc.js
-   index.jsx
-   package.json
-   yarn.lock
-   (source_tree node_modules))
-  (targets index.js)
-  (mode (promote (until-clean)))
-  (action (run yarn build)))
-
-(alias
- (name all-js)
- (deps
-   merlin_worker.bc.js
-   editor/merlin_editor.bc.js))
+;  (rule
+;   (deps
+;    merlin_worker.bc.js
+;    client/merlin_client.bc.js
+;    index.jsx
+;    package.json
+;    yarn.lock
+;    (source_tree node_modules))
+;   (targets index.js)
+;   (mode (promote (until-clean)))
+;   (action (run yarn build)))

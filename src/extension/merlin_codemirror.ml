@@ -1,20 +1,11 @@
 open Code_mirror
 open Brr
 
-let basic_setup = Jv.get Jv.global "__CM__basic_setup" |> Extension.of_jv
+module Utils = Utils
 
-let get_el_by_id i =
-  Brr.Document.find_el_by_id G.document (Jstr.of_string i) |> Option.get
-
-let worker = Merlin_client.make_worker "merlin_worker.bc.js"
-
-let get_full_doc state =
-  let lines = Editor.(state |> State.doc |> Text.to_jstr_array) in
-  lines |> Array.map Jstr.to_string |> Array.to_list |> String.concat "\n"
-
-let linter : (Editor.View.t -> Lint.Diagnostic.t array Fut.t) = fun view ->
+let linter worker = fun view ->
   let open Fut.Syntax in
-  let doc = get_full_doc @@ Editor.View.state view in
+  let doc = Utils.get_full_doc @@ Editor.View.state view in
   let+ result = Merlin_client.query_errors worker doc in
   List.map (fun Protocol.{ kind; loc; main; sub = _; source } ->
       let from = loc.loc_start.pos_cnum in
@@ -42,9 +33,9 @@ let linter : (Editor.View.t -> Lint.Diagnostic.t array Fut.t) = fun view ->
       "private"; "sig"; "to"; "try"; "value"; "virtual"; "when";
     ]
 
-let merlin_completion : Autocomplete.Context.t -> Autocomplete.Result.t option Fut.t = fun ctx ->
+let merlin_completion worker = fun ctx ->
   let open Fut.Syntax in
-  let source = get_full_doc @@ Autocomplete.Context.state ctx in
+  let source = Utils.get_full_doc @@ Autocomplete.Context.state ctx in
   let pos = Autocomplete.Context.pos ctx in
   let+ { from; to_; entries } =
     Merlin_client.query_completions worker source (`Offset pos)
@@ -54,18 +45,18 @@ let merlin_completion : Autocomplete.Context.t -> Autocomplete.Result.t option F
   ) entries in
   Some (Autocomplete.Result.create ~from ~to_ ~options ())
 
-let autocomplete =
+let autocomplete worker =
   let config = Autocomplete.(config ()
-    ~override:[Source.create merlin_completion; Source.from_list keywords])
+    ~override:[Source.create @@ merlin_completion worker; Source.from_list keywords])
   in
   Autocomplete.create ~config ()
 
-let tooltip_on_hover =
+let tooltip_on_hover worker =
   let open Tooltip in
   hover_tooltip
   (fun ~view ~pos ~side:_ ->
     let open Fut.Syntax in
-    let doc = get_full_doc @@ Editor.View.state view in
+    let doc = Utils.get_full_doc @@ Editor.View.state view in
     let pos = `Offset pos in
     let+ result = Merlin_client.query_type worker doc pos in
     match result with
@@ -82,16 +73,9 @@ let tooltip_on_hover =
 let ocaml = Jv.get Jv.global "__CM__mllike" |> Stream.Language.of_jv
 let ocaml = Stream.Language.define ocaml
 
-let init ?doc ?(exts = [||]) () =
-  let open Editor in
-  let config =
-    State.Config.create ?doc
-      ~extensions:(Array.concat [ [| basic_setup |]; exts ])
-      ()
-  in
-  let state = State.create ~config () in
-  let opts = View.opts ~state ~parent:(get_el_by_id "editor") () in
-  let view : View.t = View.create ~opts () in
-  (state, view)
-
-let _editor = init ~exts:[| ocaml; Lint.create linter; autocomplete; tooltip_on_hover |] ()
+let all_extensions worker = [|
+  ocaml;
+  Lint.create (linter worker);
+  autocomplete worker;
+  tooltip_on_hover worker
+|]

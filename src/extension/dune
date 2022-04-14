@@ -1,0 +1,11 @@
+(library
+ (name merlin_codemirror)
+ (public_name merlin-js.code-mirror)
+ (libraries
+  brr
+  merlin_client
+  code-mirror
+  code-mirror.lint
+  code-mirror.autocomplete
+  code-mirror.tooltip
+  code-mirror.stream))

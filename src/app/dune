@@ -1,0 +1,19 @@
+(executable
+ (name app)
+ (modes js)
+ (promote)
+ (libraries
+  merlin_client
+  code-mirror
+  merlin-js.code-mirror))
+
+
+(copy_files
+ (mode promote)
+ (files ../worker/merlin_worker.bc.js))
+
+(alias
+ (name all-js)
+ (deps
+   merlin_worker.bc.js
+   app.bc.js))
