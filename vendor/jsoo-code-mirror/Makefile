@@ -1,6 +1,6 @@
-.PHONY: example node dev
+.PHONY: example node dev release
 example:
-	dune build
+	dune build --ignore-promoted-rules
 	parcel _build/default/example/src/index.html
 
 node:
@@ -8,3 +8,6 @@ node:
 
 dev: node
   dune build --watch
+
+release:
+  dune build -p code-mirror

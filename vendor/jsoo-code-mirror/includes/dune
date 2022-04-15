@@ -2,8 +2,13 @@
  (deps (source_tree %{project_root}/node_modules))
  (target bundle-es6.js)
  (action
-  (run %{project_root}/node_modules/esbuild/bin/esbuild %{dep:includes.js} --bundle --outfile=%{target})))
+  (run %{project_root}/node_modules/esbuild/bin/esbuild
+   %{dep:includes.js}
+   --bundle
+   --outfile=%{target})))
 
+; warning: node modules are not managed by dune
+; in dev mode one should call `npm install` before the first build
 (rule
  (deps
   %{project_root}/package.json
@@ -12,5 +17,20 @@
  (target bundle.js)
  (mode promote)
  (action
-  (run %{project_root}/node_modules/@babel/cli/bin/babel.js %{dep:bundle-es6.js} --config-file %{project_root}/babel.config.js
+  (run %{project_root}/node_modules/@babel/cli/bin/babel.js
+   %{dep:bundle-es6.js}
+   --config-file %{project_root}/babel.config.js
    -o %{target})))
+
+; We promote the bundle to the source-tree that way it does not need to be
+; rebuilt on release mode, the promoted version is reused. To always reuse it
+; one could also use the --ignore-promoted-rules flag.
+
+; Relevant documentation:
+; https://dune.readthedocs.io/en/stable/dune-files.html#modes
+; There are two use cases for promote rules. The first one is when the generated
+; code is easier to review than the generator, so it's easier to commit the
+; generated code and review it. The second is to cut down dependencies during
+; releases. By passing --ignore-promoted-rules to Dune, rules with (mode
+; promote) will be ignored, and the source files will be used instead. The -p
+; flag implies --ignore-promote-rules.
