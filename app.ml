@@ -1,5 +1,7 @@
 open Code_mirror
-open Merlin_codemirror
+
+module Merlin =
+  Merlin_codemirror.Make (struct let worker_url = "merlin_worker.bc.js" end)
 
 let basic_setup = Jv.get Jv.global "__CM__basic_setup" |> Extension.of_jv
 
@@ -11,10 +13,11 @@ let init ?doc ?(exts = [||]) () =
       ()
   in
   let state = State.create ~config () in
-  let opts = View.opts ~state ~parent:(Utils.get_el_by_id "editor") () in
+  let opts = View.opts
+    ~state
+    ~parent:(Merlin_codemirror.Utils.get_el_by_id "editor") ()
+  in
   let view : View.t = View.create ~opts () in
   (state, view)
 
-let worker = Merlin_client.make_worker "merlin_worker.bc.js"
-
-let _editor = init ~exts:(all_extensions worker) ()
+let _editor = init ~exts:(Merlin.all_extensions) ()
