@@ -1,0 +1,14 @@
+(env
+ (_ (js_of_ocaml (compilation_mode whole_program))))
+
+(executable
+ (name merlin_worker)
+ (modules merlin_worker)
+ (promote (until-clean))
+ (modes js)
+ (libraries worker))
+
+; (install
+;  (files merlin_worker.bc.js)
+;  (section share)
+;  (package merlin-js))
