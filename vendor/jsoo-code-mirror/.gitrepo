@@ -5,8 +5,8 @@
 ;
 [subrepo]
 	remote = git@github.com:voodoos/jsoo-code-mirror.git
-	branch = more-bindings
-	commit = 6867ba5c40f9d92532ee78b5fb973e193329ab04
-	parent = e822defc173fc72ae5b2b5d8c80913c0b1580ed5
+	branch = upgrade-to-cm-6
+	commit = 98ccc2323ef234f619493db01431f75a44e4f306
+	parent = 6324730c91a5b7dd4b26324922fe28ae7ddd3550
 	method = merge
 	cmdver = 0.4.3

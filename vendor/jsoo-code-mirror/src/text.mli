@@ -26,5 +26,4 @@ val length : t -> int
 (** Length of the text *)
 
 val line : int -> t -> Line.t
-
 val to_jstr_array : t -> Jstr.t array

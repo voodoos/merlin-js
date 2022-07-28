@@ -24,7 +24,6 @@ module Diagnostic = struct
   type t = Jv.t
 
   let from t = Jv.Int.get t "from"
-
   let to_ t = Jv.Int.get t "to"
 
   type severity = Info | Warning | Error
@@ -54,9 +53,7 @@ module Diagnostic = struct
     o
 
   let source t = Jv.Jstr.find t "source"
-
   let message t = Jv.Jstr.get t "message"
-
   let actions t = Option.map (Jv.to_array Action.to_jv) (Jv.find t "actions")
 
   include (Jv.Id : Jv.CONV with type t := t)

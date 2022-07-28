@@ -25,7 +25,8 @@ module Completion : sig
     ?apply:t ->
     ?type_:string ->
     ?boost:int ->
-    unit -> t
+    unit ->
+    t
   (** Creates a completion.
 
     @param label The label to show in the completion picker.
@@ -87,7 +88,8 @@ module Result : sig
     options:Completion.t list ->
     ?span:RegExp.t ->
     ?filter:bool ->
-    unit -> t
+    unit ->
+    t
   (** Creating a new completion result (see {{: https://codemirror.net/6/docs/ref/#autocomplete.CompletionResult} the docs}).
     @param from The start of the range that is being completed.
     @param to_ The end of the range that is being completed. Defaults to the
@@ -128,9 +130,7 @@ val config :
   ?add_to_options:Jv.t ->
   unit ->
   config
-  (** Configuration options for your autocompleter, see {{: https://codemirror.net/6/docs/ref/#autocomplete.autocompletion^config} the online docs}.*)
+(** Configuration options for your autocompleter, see {{: https://codemirror.net/6/docs/ref/#autocomplete.autocompletion^config} the online docs}.*)
 
-val create :
-  ?config:config -> unit ->
-  Code_mirror.Extension.t
-  (** Autocompleter *)
+val create : ?config:config -> unit -> Code_mirror.Extension.t
+(** Autocompleter *)

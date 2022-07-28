@@ -1,16 +1,9 @@
-(** A regular expression *)
 type t
+(** A regular expression *)
 
 include Jv.CONV with type t := t
 
-type opts =
-  | Indices
-  | Global
-  | Ignore
-  | Multiline
-  | DotAll
-  | Unicode
-  | Sticky
+type opts = Indices | Global | Ignore | Multiline | DotAll | Unicode | Sticky
 
 val create : ?opts:opts list -> string -> t
 (** Create a regular expression from a string. Internally this uses
@@ -18,8 +11,8 @@ val create : ?opts:opts list -> string -> t
     {{:https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/RegExp/RegExp}
     has it's own documentation}. Note we pass noo flags at the moment. *)
 
-(** The result of executing a regular expression search on a string *)
 type result
+(** The result of executing a regular expression search on a string *)
 
 val get_full_string_match : result -> string
 (** The matched text *)

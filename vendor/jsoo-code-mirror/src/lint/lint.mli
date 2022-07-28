@@ -14,11 +14,9 @@ end
 
 module Diagnostic : sig
   type t
-
   type severity = Info | Warning | Error
 
   val severity_of_string : string -> severity
-
   val severity_to_string : severity -> string
 
   val create :
@@ -32,15 +30,10 @@ module Diagnostic : sig
     t
 
   val severity : t -> severity
-
   val from : t -> int
-
   val to_ : t -> int
-
   val source : t -> Jstr.t option
-
   val actions : t -> Action.t array option
-
   val message : t -> Jstr.t
 end
 

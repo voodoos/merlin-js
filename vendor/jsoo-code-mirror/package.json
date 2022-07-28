@@ -13,12 +13,14 @@
         "translate": "babel vendor --out-dir vendor/out"
     },
     "dependencies": {
-        "@codemirror/autocomplete": "0.19.15",
-        "@codemirror/basic-setup": "0.19.3",
-        "@codemirror/legacy-modes": "0.19.1",
-        "@codemirror/lint": "0.19.6",
-        "@codemirror/stream-parser": "0.19.9",
-        "@codemirror/theme-one-dark": "0.19.1"
+        "codemirror": "^6.0.0",
+        "@codemirror/view": "^6.0.0",
+        "@codemirror/state": "^6.0.0",
+        "@codemirror/language": "^6.0.0",
+        "@codemirror/autocomplete": "^6.0.0",
+        "@codemirror/legacy-modes": "^6.0.0",
+        "@codemirror/lint": "^6.0.0",
+        "@codemirror/theme-one-dark": "^6.0.0"
     },
     "devDependencies": {
         "@babel/cli": "^7.16.8",

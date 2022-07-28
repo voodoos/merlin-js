@@ -1,4 +1,4 @@
-.PHONY: example node dev release
+.PHONY: example node bundle fmt
 example:
 	dune build --ignore-promoted-rules
 	parcel _build/default/example/src/index.html
@@ -6,8 +6,10 @@ example:
 node:
 	npm install
 
-dev: node
-  dune build --watch
+# Use that command if you want to re-generate the static bundled in the includes
+# folder, for example if there was an update of code-mirror.
+bundle: node
+	dune build --profile=with-bundle
 
-release:
-  dune build -p code-mirror
+fmt:
+	dune build @fmt --auto-promote
