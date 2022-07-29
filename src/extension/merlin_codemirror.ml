@@ -23,15 +23,16 @@ let linter worker = fun view ->
   |> Array.of_list
 
 let keywords = List.map
-  (fun label -> Autocomplete.Completion.create ~label ~type_:"keyword" ())
-  [
-    "as"; "do"; "else"; "end"; "exception"; "fun"; "functor"; "if"; "in";
-    "include"; "let"; "of"; "open"; "rec"; "struct"; "then"; "type"; "val";
-    "while"; "with"; "and"; "assert"; "begin"; "class"; "constraint";
-    "done"; "downto"; "external"; "function"; "initializer"; "lazy";
-    "match"; "method"; "module"; "mutable"; "new"; "nonrec"; "object";
-    "private"; "sig"; "to"; "try"; "value"; "virtual"; "when";
-  ]
+  (fun label ->
+    Autocomplete.Completion.create ~label ~type_:"keyword" ())
+    [
+      "as"; "do"; "else"; "end"; "exception"; "fun"; "functor"; "if"; "in";
+      "include"; "let"; "of"; "open"; "rec"; "struct"; "then"; "type"; "val";
+      "while"; "with"; "and"; "assert"; "begin"; "class"; "constraint";
+      "done"; "downto"; "external"; "function"; "initializer"; "lazy";
+      "match"; "method"; "module"; "mutable"; "new"; "nonrec"; "object";
+      "private"; "sig"; "to"; "try"; "value"; "virtual"; "when";
+    ]
 
 let merlin_completion worker = fun ctx ->
   let open Fut.Syntax in
@@ -41,15 +42,17 @@ let merlin_completion worker = fun ctx ->
     Merlin_client.query_completions worker source (`Offset pos)
   in
   let options =
-    List.map (fun Query_protocol.Compl.{ name; desc; _ } ->
-      Autocomplete.Completion.create ~label:name ~detail:desc ()) entries
+    let num_completions = List.length entries in
+    List.mapi (fun i Query_protocol.Compl.{ name; desc; _ } ->
+      let boost = num_completions - i in
+      Autocomplete.Completion.create ~label:name ~detail:desc ~boost ()) entries
   in
-  Some (Autocomplete.Result.create ~from ~to_ ~options ())
+  Some (Autocomplete.Result.create ~filter:true ~from ~to_ ~options ())
 
 let autocomplete worker =
   let override = [
-    Autocomplete.Source.create @@ merlin_completion worker;
-    Autocomplete.Source.from_list keywords]
+    Autocomplete.Source.from_list keywords;
+    Autocomplete.Source.create @@ merlin_completion worker]
 in
   let config = Autocomplete.config () ~override in
   Autocomplete.create ~config ()
