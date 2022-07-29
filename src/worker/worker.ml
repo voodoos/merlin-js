@@ -1,5 +1,4 @@
 open Merlin_utils
-open Brr
 open Std
 open Merlin_kernel
 module Location = Ocaml_parsing.Location
@@ -18,7 +17,6 @@ let dispatch source query  =
   Mpipeline.with_pipeline pipeline @@ fun () -> (
     Query_commands.dispatch pipeline query
   )
-
 
 module Completion = struct
   (* Prefixing code from ocaml-lsp-server *)
@@ -111,8 +109,6 @@ module Completion = struct
     let from =
       to_ - String.length (prefix_of_position ~short_path:true source position)
     in
-
-    Console.(log ["Prefix:";prefix]);
     if prefix = "" then
       None
     else
@@ -131,12 +127,10 @@ let dump () =
     Mconfig.dump (Mpipeline.final_config pipeline)
     |> Json.pretty_to_string *)
 
-let on_message e =
-  let marshaled_message = Brr_io.Message.Ev.data e in
+let on_message marshaled_message =
   let action : Protocol.action =
     Marshal.from_bytes marshaled_message 0
   in
-  Console.(log ["w: Received message:"; action]);
   let res =
     match action with
     | Complete_prefix (source, position) ->
@@ -153,7 +147,6 @@ let on_message e =
       let query = Query_protocol.Type_enclosing (None, position, None) in
       Protocol.Typed_enclosings (dispatch source query)
     | Protocol.All_errors source ->
-        Console.(log ["w: Query errors"]);
         let source = Msource.make source in
         let query = Query_protocol.Errors {
             lexing = true;
@@ -183,14 +176,14 @@ let on_message e =
         Protocol.Errors errors
   in
   let res = Marshal.to_bytes res [] in
-  Brr_webworkers.Worker.G.post res
+  Js_of_ocaml.Worker.post_message res
 
 
 let run () =
   (* Load the CMIs into the pseudo file-system *)
   (* This add roughly 3mo to the final script. These could be loaded dynamically
   after the worker *)
-  List.iter Static_files.stdlib_cmis ~f:(fun (path, content) ->
+  List.iter Static_files.stdlib_cmis ~f:(fun ( path, content) ->
     let name = Filename.(concat "/static/stdlib" (basename path)) in
     Js_of_ocaml.Sys_js.create_file ~name ~content);
-  Jv.(set global "onmessage" @@ Jv.repr on_message)
+  Js_of_ocaml.Worker.set_onmessage on_message
