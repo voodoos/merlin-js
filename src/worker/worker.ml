@@ -4,14 +4,6 @@ open Std
 open Merlin_kernel
 module Location = Ocaml_parsing.Location
 
-(* Load the CMIs into the pseudo file-system *)
-(* This add roughly 3mo to the final script. These could be loaded dynamically
-after the worker *)
-let () = List.iter ~f:(fun (path, content) ->
-  let name = Filename.(concat "/static/stdlib" (basename path)) in
-  Js_of_ocaml.Sys_js.create_file ~name ~content
-  ) Static_files.stdlib_cmis
-
 let config =
   let initial = Mconfig.initial in
   { initial with
@@ -193,6 +185,12 @@ let on_message e =
   let res = Marshal.to_bytes res [] in
   Brr_webworkers.Worker.G.post res
 
-let () = Jv.(set global "onmessage" @@ Jv.repr on_message)
 
-(* let () = Console.(log [dump (); dump_config ()]) *)
+let run () =
+  (* Load the CMIs into the pseudo file-system *)
+  (* This add roughly 3mo to the final script. These could be loaded dynamically
+  after the worker *)
+  List.iter Static_files.stdlib_cmis ~f:(fun (path, content) ->
+    let name = Filename.(concat "/static/stdlib" (basename path)) in
+    Js_of_ocaml.Sys_js.create_file ~name ~content);
+  Jv.(set global "onmessage" @@ Jv.repr on_message)

@@ -8,30 +8,30 @@ let linter worker = fun view ->
   let doc = Utils.get_full_doc @@ Editor.View.state view in
   let+ result = Merlin_client.query_errors worker doc in
   List.map (fun Protocol.{ kind; loc; main; sub = _; source } ->
-      let from = loc.loc_start.pos_cnum in
-      let to_ = loc.loc_end.pos_cnum in
-      let source = Protocol.report_source_to_string source in
-      let severity = match kind with
-        | Report_error
-        | Report_warning_as_error _
-        | Report_alert_as_error _ -> Lint.Diagnostic.Error
-        | Report_warning _ -> Lint.Diagnostic.Warning
-        | Report_alert _ -> Lint.Diagnostic.Info
-      in
-      Lint.Diagnostic.create ~source ~from ~to_ ~severity ~message:main ()
-    ) result
+    let from = loc.loc_start.pos_cnum in
+    let to_ = loc.loc_end.pos_cnum in
+    let source = Protocol.report_source_to_string source in
+    let severity = match kind with
+      | Report_error
+      | Report_warning_as_error _
+      | Report_alert_as_error _ -> Lint.Diagnostic.Error
+      | Report_warning _ -> Lint.Diagnostic.Warning
+      | Report_alert _ -> Lint.Diagnostic.Info
+    in
+    Lint.Diagnostic.create ~source ~from ~to_ ~severity ~message:main ()
+  ) result
   |> Array.of_list
 
-  let keywords = List.map
-    (fun label -> Autocomplete.Completion.create ~label ~type_:"keyword" ())
-    [
-      "as"; "do"; "else"; "end"; "exception"; "fun"; "functor"; "if"; "in";
-      "include"; "let"; "of"; "open"; "rec"; "struct"; "then"; "type"; "val";
-      "while"; "with"; "and"; "assert"; "begin"; "class"; "constraint";
-      "done"; "downto"; "external"; "function"; "initializer"; "lazy";
-      "match"; "method"; "module"; "mutable"; "new"; "nonrec"; "object";
-      "private"; "sig"; "to"; "try"; "value"; "virtual"; "when";
-    ]
+let keywords = List.map
+  (fun label -> Autocomplete.Completion.create ~label ~type_:"keyword" ())
+  [
+    "as"; "do"; "else"; "end"; "exception"; "fun"; "functor"; "if"; "in";
+    "include"; "let"; "of"; "open"; "rec"; "struct"; "then"; "type"; "val";
+    "while"; "with"; "and"; "assert"; "begin"; "class"; "constraint";
+    "done"; "downto"; "external"; "function"; "initializer"; "lazy";
+    "match"; "method"; "module"; "mutable"; "new"; "nonrec"; "object";
+    "private"; "sig"; "to"; "try"; "value"; "virtual"; "when";
+  ]
 
 let merlin_completion worker = fun ctx ->
   let open Fut.Syntax in
@@ -40,21 +40,24 @@ let merlin_completion worker = fun ctx ->
   let+ { from; to_; entries } =
     Merlin_client.query_completions worker source (`Offset pos)
   in
-  let options = List.map (fun Query_protocol.Compl.{ name; desc; _ } ->
-    Autocomplete.Completion.create ~label:name ~detail:desc ()
-  ) entries in
+  let options =
+    List.map (fun Query_protocol.Compl.{ name; desc; _ } ->
+      Autocomplete.Completion.create ~label:name ~detail:desc ()) entries
+  in
   Some (Autocomplete.Result.create ~from ~to_ ~options ())
 
 let autocomplete worker =
-  let config = Autocomplete.(config ()
-    ~override:[Source.create @@ merlin_completion worker; Source.from_list keywords])
-  in
+  let override = [
+    Autocomplete.Source.create @@ merlin_completion worker;
+    Autocomplete.Source.from_list keywords]
+in
+  let config = Autocomplete.config () ~override in
   Autocomplete.create ~config ()
 
 let tooltip_on_hover worker =
   let open Tooltip in
-  hover_tooltip
-  (fun ~view ~pos ~side:_ ->
+  hover_tooltip @@
+  fun ~view ~pos ~side:_ ->
     let open Fut.Syntax in
     let doc = Utils.get_full_doc @@ Editor.View.state view in
     let pos = `Offset pos in
@@ -68,21 +71,18 @@ let tooltip_on_hover worker =
       let pos = loc.loc_start.pos_cnum in
       let end_ = loc.loc_end.pos_cnum in
       Some (Tooltip.create ~pos ~end_ ~above:true ~arrow:true ~create ())
-    | _ -> None)
+    | _ -> None
 
 let ocaml = Jv.get Jv.global "__CM__mllike" |> Stream.Language.of_jv
 let ocaml = Stream.Language.define ocaml
 
 module Make (Config : sig val worker_url : string end) = struct
   let worker = Merlin_client.make_worker Config.worker_url
-
   let autocomplete = autocomplete worker
   let tooltip_on_hover = tooltip_on_hover worker
-
   let linter = Lint.create (linter worker)
 
   let all_extensions = [|
-    ocaml;
     linter;
     autocomplete;
     tooltip_on_hover
