@@ -1,0 +1,9 @@
+(env
+ (_ (js_of_ocaml (compilation_mode whole_program))))
+
+(executable
+ (name merlin_worker)
+ (modules merlin_worker)
+ (promote (until-clean))
+ (modes js)
+ (libraries worker))

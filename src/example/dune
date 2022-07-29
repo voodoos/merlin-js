@@ -10,7 +10,7 @@
 
 (copy_files
  (mode promote)
- (files ../worker/merlin_worker.bc.js))
+ (files worker/merlin_worker.bc.js))
 
 (alias
  (name all-js)
