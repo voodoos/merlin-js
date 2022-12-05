@@ -23,8 +23,10 @@ let make_worker url =
     let data : Protocol.answer = Marshal.from_bytes data_marshaled 0 in
     res_fut worker data
   in
-  Ev.listen Brr_io.Message.Ev.message on_message @@
-    Worker.as_target worker.worker;
+  let _listener =
+    Ev.listen Brr_io.Message.Ev.message on_message @@
+      Worker.as_target worker.worker
+  in
   worker
 
 (* todo share that with worker *)
