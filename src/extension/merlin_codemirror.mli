@@ -6,7 +6,12 @@ end
 val ocaml : Code_mirror.Extension.t
 (** An extension providing OCaml syntax highlighting *)
 
-module Make : functor (Config : sig val worker_url : string end) -> sig
+module Make : functor
+  (Config : sig
+     val worker_url : string
+     val jump_to_definition_key : Code_mirror.Editor.Key_binding.t
+   end)
+  -> sig
   val autocomplete : Code_mirror.Extension.t
   (** An extension providing completions when typing *)
 

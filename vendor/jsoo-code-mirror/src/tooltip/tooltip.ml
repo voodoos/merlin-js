@@ -1,4 +1,5 @@
 open Code_mirror
+let code_mirror_view = Jv.get Jv.global "__CM__view"
 
 module Tooltip_view = struct
   type t = Jv.t
@@ -106,4 +107,4 @@ let hover_tooltip ?config source =
     if Option.is_none config then [| source |]
     else [| source; Option.get config |]
   in
-  Jv.call Jv.global "__CM__hoverTooltip" args |> Extension.of_jv
+  Jv.call code_mirror_view "hoverTooltip" args |> Extension.of_jv

@@ -1,1 +1,3 @@
-(dirs :standard \ jsoo-code-mirror)
+(vendored_dirs *)
+
+;(dirs :standard \ jsoo-code-mirror)
