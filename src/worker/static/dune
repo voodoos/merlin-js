@@ -4,11 +4,14 @@
  (name static_files)
  (public_name merlin-js.worker.static)
  (modules static_files)
- (preprocess (pps ppx_blob))
+ (preprocess
+  (pps ppx_blob))
  (preprocessor_deps
   (glob_files stdlib/*.cmi)))
 
 (rule
  (target static_files.ml)
- (deps (glob_files stdlib/*.cmi))
- (action (run ocaml %{dep:gen_static.ml})))
+ (deps
+  (glob_files stdlib/*.cmi))
+ (action
+  (run ocaml %{dep:gen_static.ml})))
