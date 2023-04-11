@@ -3,9 +3,10 @@ module Location = Ocaml_parsing.Location
 
 type source = string
 
+(** CMIs are provided either statically or as URLs to be downloaded on demand *)
 type cmis = {
-  static_cmis : (string * string) list;
-  cmi_urls : string list
+  static_cmis : (string * string) list; (** name, content pairs *)
+  cmi_urls : string list (** One URL per cmi, e.g. "/static/stdlib/stdlib__List.cmi" *)
 }
 
 type action =
