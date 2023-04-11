@@ -5,7 +5,6 @@
   (javascript_files stubs.js))
  (preprocess (pps js_of_ocaml-ppx))
  (libraries
-  static_files
   protocol
   merlin-lib.kernel
   merlin-lib.utils

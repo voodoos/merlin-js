@@ -79,8 +79,17 @@ let tooltip_on_hover worker =
 let ocaml = Jv.get Jv.global "__CM__mllike" |> Stream.Language.of_jv
 let ocaml = Stream.Language.define ocaml
 
-module Make (Config : sig val worker_url : string end) = struct
-  let worker = Merlin_client.make_worker Config.worker_url
+module type Config = sig
+  val worker_url : string
+  val cmis : Protocol.cmis
+end
+
+module Make (Config : Config) = struct
+  let worker =
+    let worker = Merlin_client.make_worker Config.worker_url in
+    let _ = Merlin_client.add_cmis worker Config.cmis in
+    worker
+
   let autocomplete = autocomplete worker
   let tooltip_on_hover = tooltip_on_hover worker
   let linter = Lint.create (linter worker)

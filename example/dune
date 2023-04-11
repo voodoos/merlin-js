@@ -5,7 +5,8 @@
  (libraries
   merlin_client
   code-mirror
-  merlin-js.code-mirror))
+  merlin-js.code-mirror
+  static_files))
 
 (copy_files
  (mode promote)

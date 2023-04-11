@@ -3,10 +3,16 @@ module Location = Ocaml_parsing.Location
 
 type source = string
 
+type cmis = {
+  static_cmis : (string * string) list;
+  cmi_urls : string list
+}
+
 type action =
   | Complete_prefix of source * Msource.position
   | Type_enclosing of source * Msource.position
   | All_errors of source
+  | Add_cmis of cmis
 
 type error = {
   kind : Location.report_kind;
@@ -31,6 +37,7 @@ type answer =
  | Completions of completions
  | Typed_enclosings of
     (Location.t * [ `Index of int | `String of string ] * is_tail_position) list
+ | Added_cmis
 
 let report_source_to_string = function
   | Location.Lexer   -> "lexer"

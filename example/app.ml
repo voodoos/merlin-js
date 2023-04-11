@@ -1,7 +1,10 @@
 open Code_mirror
 
 module Merlin =
-  Merlin_codemirror.Make (struct let worker_url = "merlin_worker.bc.js" end)
+  Merlin_codemirror.Make (struct
+    let worker_url = "merlin_worker.bc.js"
+    let cmis = { Protocol.static_cmis = Static_files.stdlib_cmis; cmi_urls = [] }
+  end)
 
 let basic_setup = Jv.get Jv.global "__CM__basic_setup" |> Extension.of_jv
 
