@@ -15,11 +15,12 @@ let () =
   let stdlib = Filename.concat cwd "stdlib" in
   let out = open_out "static_files.ml" in
 
-  Printf.fprintf out "let stdlib_cmis = [";
+  Printf.fprintf out "open Protocol\nlet stdlib_cmis = [";
   let dir = Unix.opendir stdlib in
   iter_cmi ~f:(fun file ->
     let fullpath = Filename.concat stdlib file in
-    Printf.fprintf out "(%S,[%%blob %S]);" fullpath fullpath) dir;
+    let module_name = Filename.basename file |> String.capitalize_ascii in
+    Printf.fprintf out "{sc_name=%S; sc_content=[%%blob %S]};" module_name fullpath) dir;
     Printf.fprintf out "]\n";
 
   close_out out

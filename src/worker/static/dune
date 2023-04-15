@@ -5,6 +5,7 @@
  (public_name merlin-js.worker.static)
  (modules static_files)
  (preprocess (pps ppx_blob))
+ (libraries merlin-js.protocol)
  (preprocessor_deps
   (glob_files stdlib/*.cmi)))
 

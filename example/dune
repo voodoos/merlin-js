@@ -7,7 +7,7 @@
   merlin_client
   code-mirror
   merlin-js.code-mirror
-  static_files))
+  merlin-js.worker.static))
 
 (executable
  (name dynamic)

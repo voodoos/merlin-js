@@ -19,85 +19,67 @@ let sync_get url =
           (fun b -> Some (Typed_array.String.of_arrayBuffer b))
     | _ -> None
   
-type signature = Ocaml_typing.Types.signature_item list
-type flags = Ocaml_typing.Cmi_format.pers_flags list
-type header = string * signature
-type crcs = (string * Digest.t option) list
+let filename_of_module unit_name =
+  Printf.sprintf "%s.cmi" (String.uncapitalize_ascii unit_name)
 
-(** The following two functions are taken from cmi_format.ml in
-    the compiler, but changed to work on bytes rather than input
-    channels *)
-let input_cmi str =
-  let offset = 0 in
-  let (name, sign) = (Marshal.from_bytes str offset : header) in
-  let offset = offset + Marshal.total_size str offset in
-  let crcs = (Marshal.from_bytes str offset : crcs) in
-  let offset = offset + Marshal.total_size str offset in
-  let flags = (Marshal.from_bytes str offset : flags) in
-  {
-    Ocaml_typing.Cmi_format.cmi_name = name;
-    cmi_sign = sign;
-    cmi_crcs = crcs;
-    cmi_flags = flags;
-  }
-  
-let read_cmi filename str =
-  let magic = Ocaml_utils.Config.cmi_magic_number in
-  let magic_len = String.length magic in
-  let buffer = Bytes.sub str 0 magic_len in
-  (if buffer <> Bytes.of_string magic then
-    let pre_len = String.length magic - 3 in
-    if
-      Bytes.sub buffer 0 pre_len
-      = Bytes.of_string @@ String.sub magic ~pos:0 ~len:pre_len
-    then
-      let msg =
-        if buffer < Bytes.of_string magic then "an older"
-        else "a newer"
-      in
-      raise (Ocaml_typing.Magic_numbers.Cmi.Error (Wrong_version_interface (filename, msg)))
-    else raise (Ocaml_typing.Magic_numbers.Cmi.Error (Not_an_interface filename)));
-  input_cmi (Bytes.sub str magic_len (Bytes.length str - magic_len))
-  
-let memoize f =
-  let memo = Hashtbl.create 10 in
-  fun x ->
-    match Hashtbl.find_opt memo x with
-    | Some x -> x
-    | None ->
-      let result = f x in
-      Hashtbl.replace memo x result;
-      result
+let reset_dirs () =
+  Ocaml_utils.Directory_content_cache.clear ();
+  let open Ocaml_utils.Load_path in
+  let dirs = get_paths () in
+  reset ();
+  List.iter ~f:(fun p ->
+    prepend_dir (Dir.create p)) dirs
 
-let add_cmis cmi_urls =
-    let cmi_files =
-      List.map
-        ~f:(fun cmi -> (Filename.basename cmi |> Filename.chop_extension, cmi))
-        cmi_urls
-    in
+let add_dynamic_cmis dcs =
     let open Ocaml_typing.Persistent_env.Persistent_signature in
     let old_loader = !load in
-    let fetch = memoize
-      (fun unit_name ->
+
+    let fetch =
+      (fun filename ->
         let open Option.Infix in
-        List.assoc_opt (String.uncapitalize_ascii unit_name) cmi_files >>= sync_get >>| Bytes.of_string)
+        let url = Filename.concat dcs.Protocol.dcs_url filename in
+        sync_get url)
     in
+
+    List.iter ~f:(fun name ->
+      let filename = filename_of_module name in
+      match fetch (filename_of_module name) with
+      | Some content ->
+        let name = Filename.(concat "/static/stdlib" filename) in
+        Js_of_ocaml.Sys_js.create_file ~name ~content
+      | None -> ()) dcs.dcs_toplevel_modules;
+
     let new_load ~unit_name =
-      match fetch unit_name with
-      | Some x ->
-        Some {
-          filename = Sys.executable_name;
-          cmi = read_cmi unit_name x;
-        }
-      | _ -> old_loader ~unit_name
+      let filename = filename_of_module unit_name in
+      let fs_name = Filename.(concat "/static/stdlib" filename) in
+      (* Check if it's already been downloaded. This will be the 
+         case for all toplevel cmis. Also check whether we're supposed
+         to handle this cmi *)
+      if
+        not (Sys.file_exists fs_name) &&
+        List.exists ~f:(fun prefix ->
+          String.starts_with ~prefix filename) dcs.dcs_file_prefixes
+      then begin
+        match fetch filename with
+        | Some x ->
+          Js_of_ocaml.Sys_js.create_file ~name:fs_name ~content:x;
+          (* At this point we need to tell merlin that the dir contents
+              have changed *)
+          reset_dirs ()
+        | None ->
+          Printf.eprintf "Warning: Expected to find cmi at: %s\n%!"
+            (Filename.concat dcs.Protocol.dcs_url filename)
+      end;
+      old_loader ~unit_name
     in
     load := new_load
   
-  let add_cmis { Protocol.static_cmis; cmi_urls } =
-    List.iter static_cmis ~f:(fun ( path, content) ->
-      let name = Filename.(concat "/static/stdlib" (basename path)) in
-      Js_of_ocaml.Sys_js.create_file ~name ~content);
-    add_cmis cmi_urls;
+  let add_cmis { Protocol.static_cmis; dynamic_cmis } =
+    List.iter static_cmis ~f:(fun { Protocol.sc_name; sc_content } ->
+      let filename = Printf.sprintf "%s.cmi" (String.uncapitalize_ascii sc_name) in
+      let name = Filename.(concat "/static/stdlib" filename) in
+      Js_of_ocaml.Sys_js.create_file ~name ~content:sc_content);
+    Option.iter ~f:add_dynamic_cmis dynamic_cmis;
     Protocol.Added_cmis
           
 let config =
