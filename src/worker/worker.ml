@@ -3,6 +3,85 @@ open Std
 open Merlin_kernel
 module Location = Ocaml_parsing.Location
 
+let sync_get url =
+    let open Js_of_ocaml in
+    let x = XmlHttpRequest.create () in
+    x##.responseType := Js.string "arraybuffer";
+    x##_open (Js.string "GET") (Js.string url) Js._false;
+    x##send Js.null;
+    match x##.status with
+    | 200 ->
+        Js.Opt.case
+          (File.CoerceTo.arrayBuffer x##.response)
+          (fun () ->
+            Firebug.console##log (Js.string "Failed to receive file");
+            None)
+          (fun b -> Some (Typed_array.String.of_arrayBuffer b))
+    | _ -> None
+  
+let filename_of_module unit_name =
+  Printf.sprintf "%s.cmi" (String.uncapitalize_ascii unit_name)
+
+let reset_dirs () =
+  Ocaml_utils.Directory_content_cache.clear ();
+  let open Ocaml_utils.Load_path in
+  let dirs = get_paths () in
+  reset ();
+  List.iter ~f:(fun p ->
+    prepend_dir (Dir.create p)) dirs
+
+let add_dynamic_cmis dcs =
+    let open Ocaml_typing.Persistent_env.Persistent_signature in
+    let old_loader = !load in
+
+    let fetch =
+      (fun filename ->
+        let open Option.Infix in
+        let url = Filename.concat dcs.Protocol.dcs_url filename in
+        sync_get url)
+    in
+
+    List.iter ~f:(fun name ->
+      let filename = filename_of_module name in
+      match fetch (filename_of_module name) with
+      | Some content ->
+        let name = Filename.(concat "/static/stdlib" filename) in
+        Js_of_ocaml.Sys_js.create_file ~name ~content
+      | None -> ()) dcs.dcs_toplevel_modules;
+
+    let new_load ~unit_name =
+      let filename = filename_of_module unit_name in
+      let fs_name = Filename.(concat "/static/stdlib" filename) in
+      (* Check if it's already been downloaded. This will be the 
+         case for all toplevel cmis. Also check whether we're supposed
+         to handle this cmi *)
+      if
+        not (Sys.file_exists fs_name) &&
+        List.exists ~f:(fun prefix ->
+          String.starts_with ~prefix filename) dcs.dcs_file_prefixes
+      then begin
+        match fetch filename with
+        | Some x ->
+          Js_of_ocaml.Sys_js.create_file ~name:fs_name ~content:x;
+          (* At this point we need to tell merlin that the dir contents
+              have changed *)
+          reset_dirs ()
+        | None ->
+          Printf.eprintf "Warning: Expected to find cmi at: %s\n%!"
+            (Filename.concat dcs.Protocol.dcs_url filename)
+      end;
+      old_loader ~unit_name
+    in
+    load := new_load
+  
+  let add_cmis { Protocol.static_cmis; dynamic_cmis } =
+    List.iter static_cmis ~f:(fun { Protocol.sc_name; sc_content } ->
+      let filename = Printf.sprintf "%s.cmi" (String.uncapitalize_ascii sc_name) in
+      let name = Filename.(concat "/static/stdlib" filename) in
+      Js_of_ocaml.Sys_js.create_file ~name ~content:sc_content);
+    Option.iter ~f:add_dynamic_cmis dynamic_cmis;
+    Protocol.Added_cmis
+          
 let config =
   let initial = Mconfig.initial in
   { initial with
@@ -174,16 +253,11 @@ let on_message marshaled_message =
           })
         in
         Protocol.Errors errors
+    | Add_cmis cmis ->
+        add_cmis cmis
   in
   let res = Marshal.to_bytes res [] in
   Js_of_ocaml.Worker.post_message res
 
-
 let run () =
-  (* Load the CMIs into the pseudo file-system *)
-  (* This add roughly 3mo to the final script. These could be loaded dynamically
-  after the worker *)
-  List.iter Static_files.stdlib_cmis ~f:(fun ( path, content) ->
-    let name = Filename.(concat "/static/stdlib" (basename path)) in
-    Js_of_ocaml.Sys_js.create_file ~name ~content);
   Js_of_ocaml.Worker.set_onmessage on_message

@@ -4,7 +4,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1.0">
-  <script type="text/javascript" defer src="app.bc.js"></script>
+  <script type="text/javascript" defer src="dynamic.bc.js"></script>
   <!-- <script type="text/javascript" defer src="index.js"></script> -->
   <title>Merlin the web</title>
   <style>
@@ -14,7 +14,7 @@
       background-color: #4c4956;
       font-family: 'Fira Code', monospace
     }
-    
+
     p {
       width: 50%;
       margin: auto;
@@ -79,8 +79,10 @@
 
 <body>
   <noscript>Sorry, you need to enable JavaScript to see this page.</noscript>
-  <p>This example demonstrates merlin with all cmis embedded. See <a href="dynamic.html">dynamic.html</a>
-  for an example of dynamically loaded cmis.</p>
+  <p>This example demonstrates merlin with dynamic loading of cmis. Load the
+    'Network' tab of the developer tools to see the requests and responses.
+    See also the <a href="index.html">static example</a>.
+  </p>
   <div id="editor"></div>
 </body>
 

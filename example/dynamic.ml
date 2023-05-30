@@ -3,7 +3,24 @@ open Code_mirror
 module Merlin =
   Merlin_codemirror.Make (struct
     let worker_url = "merlin_worker.bc.js"
-    let cmis = { Protocol.static_cmis = Static_files.stdlib_cmis; dynamic_cmis = None }
+    let cmis =
+      let dcs_toplevel_modules = [
+        "CamlinternalAtomic";
+        "CamlinternalFormat";
+        "CamlinternalFormatBasics";
+        "CamlinternalLazy";
+        "CamlinternalMod";
+        "CamlinternalOO";
+        "Std_exit";
+        "Stdlib";
+        "Unix";
+        "UnixLabels";
+      ] in
+      let dcs_url = "/static/stdlib/" in
+      let dcs_file_prefixes = ["stdlib__"] in
+    { Protocol.static_cmis = [];
+      dynamic_cmis = Some {
+        dcs_url; dcs_toplevel_modules; dcs_file_prefixes } }
   end)
 
 let basic_setup = Jv.get Jv.global "__CM__basic_setup" |> Extension.of_jv
