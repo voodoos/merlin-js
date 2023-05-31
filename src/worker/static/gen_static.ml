@@ -19,7 +19,7 @@ let () =
   let dir = Unix.opendir stdlib in
   iter_cmi ~f:(fun file ->
     let fullpath = Filename.concat stdlib file in
-    let module_name = Filename.basename file |> String.capitalize_ascii in
+    let module_name = Filename.basename file |> String.capitalize_ascii |> Filename.remove_extension in
     Printf.fprintf out "{sc_name=%S; sc_content=[%%blob %S]};" module_name fullpath) dir;
     Printf.fprintf out "]\n";
 
