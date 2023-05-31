@@ -16,7 +16,7 @@ module Merlin =
         "Unix";
         "UnixLabels";
       ] in
-      let dcs_url = "/stdlib/" in
+      let dcs_url = "stdlib/" in
       let dcs_file_prefixes = ["stdlib__"] in
     { Protocol.static_cmis = [];
       dynamic_cmis = Some {
