@@ -18,17 +18,16 @@ let sync_get url =
             None)
           (fun b -> Some (Typed_array.String.of_arrayBuffer b))
     | _ -> None
-  
+
 let filename_of_module unit_name =
   Printf.sprintf "%s.cmi" (String.uncapitalize_ascii unit_name)
 
 let reset_dirs () =
   Ocaml_utils.Directory_content_cache.clear ();
   let open Ocaml_utils.Load_path in
-  let dirs = get_paths () in
+  let { visible; hidden } = get_paths () in
   reset ();
-  List.iter ~f:(fun p ->
-    prepend_dir (Dir.create p)) dirs
+  init ~auto_include:no_auto_include ~visible ~hidden
 
 let add_dynamic_cmis dcs =
     let open Ocaml_typing.Persistent_env.Persistent_signature in
@@ -49,10 +48,10 @@ let add_dynamic_cmis dcs =
         Js_of_ocaml.Sys_js.create_file ~name ~content
       | None -> ()) dcs.dcs_toplevel_modules;
 
-    let new_load ~unit_name =
+    let new_load ~allow_hidden ~unit_name =
       let filename = filename_of_module unit_name in
       let fs_name = Filename.(concat "/static/stdlib" filename) in
-      (* Check if it's already been downloaded. This will be the 
+      (* Check if it's already been downloaded. This will be the
          case for all toplevel cmis. Also check whether we're supposed
          to handle this cmi *)
       if
@@ -70,10 +69,10 @@ let add_dynamic_cmis dcs =
           Printf.eprintf "Warning: Expected to find cmi at: %s\n%!"
             (Filename.concat dcs.Protocol.dcs_url filename)
       end;
-      old_loader ~unit_name
+      old_loader ~allow_hidden ~unit_name
     in
     load := new_load
-  
+
   let add_cmis { Protocol.static_cmis; dynamic_cmis } =
     List.iter static_cmis ~f:(fun { Protocol.sc_name; sc_content } ->
       let filename = Printf.sprintf "%s.cmi" (String.uncapitalize_ascii sc_name) in
@@ -81,7 +80,7 @@ let add_dynamic_cmis dcs =
       Js_of_ocaml.Sys_js.create_file ~name ~content:sc_content);
     Option.iter ~f:add_dynamic_cmis dynamic_cmis;
     Protocol.Added_cmis
-          
+
 let config =
   let initial = Mconfig.initial in
   { initial with
