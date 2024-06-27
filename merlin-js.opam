@@ -10,7 +10,7 @@ build: [
   ["dune" "build" "-p" name "-j" jobs]
 ]
 depends: [
-  "ocaml" {>= "5.0"}
+  "ocaml" {>= "5.0" & < "5.1"}
   "dune" {>= "3.0"}
   "merlin-lib"
   "yojson" {>= "1.6.0"}
