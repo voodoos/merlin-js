@@ -10,12 +10,12 @@ build: [
   ["dune" "build" "-p" name "-j" jobs]
 ]
 depends: [
-  "ocaml" {>= "5.2" & < "5.3"}
+  "ocaml" {>= "5.2" & < "5.4"}
   "dune" {>= "3.0"}
   "merlin-lib"
   "yojson" {>= "1.6.0"}
-  "js_of_ocaml" {>= "5.0.0"}
-  "js_of_ocaml-ppx" {>= "5.0.0"}
+  "js_of_ocaml" {>= "6.0.1"}
+  "js_of_ocaml-ppx" {>= "6.0.1"}
   "brr" {>= "0.0.4"}
   "ppx_blob" {>= "0.7.2"}
   "code-mirror"
