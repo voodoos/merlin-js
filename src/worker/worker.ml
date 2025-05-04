@@ -3,6 +3,8 @@ open Std
 open Merlin_kernel
 module Location = Ocaml_parsing.Location
 
+let stdlib_path = "/static/cmis"
+
 let sync_get url =
     let open Js_of_ocaml in
     let x = XmlHttpRequest.create () in
@@ -35,7 +37,6 @@ let add_dynamic_cmis dcs =
 
     let fetch =
       (fun filename ->
-        let open Option.Infix in
         let url = Filename.concat dcs.Protocol.dcs_url filename in
         sync_get url)
     in
@@ -44,13 +45,13 @@ let add_dynamic_cmis dcs =
       let filename = filename_of_module name in
       match fetch (filename_of_module name) with
       | Some content ->
-        let name = Filename.(concat "/static/stdlib" filename) in
+        let name = Filename.(concat stdlib_path filename) in
         Js_of_ocaml.Sys_js.create_file ~name ~content
       | None -> ()) dcs.dcs_toplevel_modules;
 
     let new_load ~allow_hidden ~unit_name =
       let filename = filename_of_module unit_name in
-      let fs_name = Filename.(concat "/static/stdlib" filename) in
+      let fs_name = Filename.(concat stdlib_path filename) in
       (* Check if it's already been downloaded. This will be the
          case for all toplevel cmis. Also check whether we're supposed
          to handle this cmi *)
@@ -76,7 +77,7 @@ let add_dynamic_cmis dcs =
   let add_cmis { Protocol.static_cmis; dynamic_cmis } =
     List.iter static_cmis ~f:(fun { Protocol.sc_name; sc_content } ->
       let filename = Printf.sprintf "%s.cmi" (String.uncapitalize_ascii sc_name) in
-      let name = Filename.(concat "/static/stdlib" filename) in
+      let name = Filename.(concat stdlib_path filename) in
       Js_of_ocaml.Sys_js.create_file ~name ~content:sc_content);
     Option.iter ~f:add_dynamic_cmis dynamic_cmis;
     Protocol.Added_cmis
@@ -85,7 +86,7 @@ let config =
   let initial = Mconfig.initial in
   { initial with
     merlin = { initial.merlin with
-      stdlib = Some "/static/stdlib" }}
+      stdlib = Some stdlib_path }}
 
 let make_pipeline source =
   Mpipeline.make config source
