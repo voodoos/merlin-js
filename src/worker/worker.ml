@@ -205,58 +205,54 @@ let dump () =
     Mconfig.dump (Mpipeline.final_config pipeline)
     |> Json.pretty_to_string *)
 
-let on_message marshaled_message =
-  let action : Protocol.action =
-    Marshal.from_bytes marshaled_message 0
-  in
-  let res =
-    match action with
-    | Complete_prefix (source, position) ->
-      let source = Msource.make source in
-      begin match Completion.at_pos source position with
-      | Some (from, to_, compl) ->
-        let entries = compl.entries in
-        Protocol.Completions { from; to_; entries; }
-      | None ->
-        Protocol.Completions { from = 0; to_ = 0; entries = []; }
-      end
-    | Type_enclosing (source, position) ->
-      let source = Msource.make source in
-      let query = Query_protocol.Type_enclosing (None, position, None) in
-      Protocol.Typed_enclosings (dispatch source query)
-    | Protocol.All_errors source ->
-        let source = Msource.make source in
-        let query = Query_protocol.Errors {
-            lexing = true;
-            parsing = true;
-            typing = true;
-          }
+let on_message = function
+  | Protocol.Complete_prefix (source, position) ->
+    let source = Msource.make source in
+    begin match Completion.at_pos source position with
+    | Some (from, to_, compl) ->
+      let entries = compl.entries in
+      Protocol.Completions { from; to_; entries; }
+    | None ->
+      Protocol.Completions { from = 0; to_ = 0; entries = []; }
+    end
+  | Type_enclosing (source, position) ->
+    let source = Msource.make source in
+    let query = Query_protocol.Type_enclosing (None, position, None) in
+    Protocol.Typed_enclosings (dispatch source query)
+  | Protocol.All_errors source ->
+    let source = Msource.make source in
+    let query = Query_protocol.Errors {
+        lexing = true;
+        parsing = true;
+        typing = true;
+      }
+    in
+    let errors =
+      dispatch source query
+      |> List.map ~f:(fun (Location.{kind; main=_ ; sub; source} as error) ->
+        let of_sub sub =
+            Location.print_sub_msg Format.str_formatter sub;
+            String.trim (Format.flush_str_formatter ())
         in
-        let errors =
-          dispatch source query
-          |> List.map ~f:(fun (Location.{kind; main=_ ; sub; source} as error) ->
-            let of_sub sub =
-                Location.print_sub_msg Format.str_formatter sub;
-                String.trim (Format.flush_str_formatter ())
-            in
-            let loc = Location.loc_of_report error in
-            let main =
-              Format.asprintf "@[%a@]" Location.print_main error |> String.trim
-            in
-            Protocol.{
-              kind;
-              loc;
-              main;
-              sub = List.map ~f:of_sub sub;
-              source;
-          })
+        let loc = Location.loc_of_report error in
+        let main =
+          Format.asprintf "@[%a@]" Location.print_main error |> String.trim
         in
-        Protocol.Errors errors
-    | Add_cmis cmis ->
-        add_cmis cmis
-  in
-  let res = Marshal.to_bytes res [] in
-  Js_of_ocaml.Worker.post_message res
+        Protocol.{
+          kind;
+          loc;
+          main;
+          sub = List.map ~f:of_sub sub;
+          source;
+      })
+    in
+    Protocol.Errors errors
+  | Add_cmis cmis ->
+    add_cmis cmis
 
 let run () =
-  Js_of_ocaml.Worker.set_onmessage on_message
+  Js_of_ocaml.Worker.set_onmessage @@ fun marshaled_message ->
+  let action : Protocol.action = Marshal.from_bytes marshaled_message 0 in
+  let res = on_message action in
+  let res = Marshal.to_bytes res [] in
+  Js_of_ocaml.Worker.post_message res
