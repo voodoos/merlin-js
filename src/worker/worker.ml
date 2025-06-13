@@ -18,7 +18,7 @@ let sync_get url =
             None)
           (fun b -> Some (Typed_array.String.of_arrayBuffer b))
     | _ -> None
-  
+
 let filename_of_module unit_name =
   Printf.sprintf "%s.cmi" (String.uncapitalize_ascii unit_name)
 
@@ -52,7 +52,7 @@ let add_dynamic_cmis dcs =
     let new_load ~unit_name =
       let filename = filename_of_module unit_name in
       let fs_name = Filename.(concat "/static/stdlib" filename) in
-      (* Check if it's already been downloaded. This will be the 
+      (* Check if it's already been downloaded. This will be the
          case for all toplevel cmis. Also check whether we're supposed
          to handle this cmi *)
       if
@@ -73,23 +73,31 @@ let add_dynamic_cmis dcs =
       old_loader ~unit_name
     in
     load := new_load
-  
+
   let add_cmis { Protocol.static_cmis; dynamic_cmis } =
+    Js_of_ocaml.Firebug.console##log ["adding cmi"];
     List.iter static_cmis ~f:(fun { Protocol.sc_name; sc_content } ->
       let filename = Printf.sprintf "%s.cmi" (String.uncapitalize_ascii sc_name) in
       let name = Filename.(concat "/static/stdlib" filename) in
       Js_of_ocaml.Sys_js.create_file ~name ~content:sc_content);
     Option.iter ~f:add_dynamic_cmis dynamic_cmis;
     Protocol.Added_cmis
-          
+
 let config =
   let initial = Mconfig.initial in
   { initial with
     merlin = { initial.merlin with
-      stdlib = Some "/static/stdlib" }}
+      use_ppx_cache = false;
+      log_file = Some "-";
+      stdlib = Some "/static/stdlib"
+      }}
+
 
 let make_pipeline source =
-  Mpipeline.make config source
+  Lib_config.Json.set_pretty_to_string Yojson.Basic.pretty_to_string;
+  Logger.with_log_file Mconfig.(config.merlin.log_file)
+    ~sections:Mconfig.(config.merlin.log_sections) @@ fun () ->
+      Mpipeline.make config source
 
 let dispatch source query  =
   let pipeline = make_pipeline source in
@@ -208,7 +216,8 @@ let dump () =
 
 let on_message marshaled_message =
   let action : Protocol.action =
-    Marshal.from_bytes marshaled_message 0
+    let str = Js_of_ocaml.Js.to_bytestring marshaled_message in
+    Marshal.from_string str 0
   in
   let res =
     match action with
@@ -256,7 +265,7 @@ let on_message marshaled_message =
     | Add_cmis cmis ->
         add_cmis cmis
   in
-  let res = Marshal.to_bytes res [] in
+  let res = Marshal.to_string res [] |> Js_of_ocaml.Js.bytestring in
   Js_of_ocaml.Worker.post_message res
 
 let run () =

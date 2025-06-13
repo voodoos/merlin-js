@@ -1,0 +1,4 @@
+- Need dev verion of binaryen
+- Bad marshal strings when speaking to worked
+- bad stub : was float instead of 4 floats
+- a real bug in compare_val ?

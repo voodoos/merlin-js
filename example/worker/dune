@@ -3,4 +3,7 @@
  (modules merlin_worker)
  (promote (until-clean))
  (modes js)
+ (js_of_ocaml (flags :standard --pretty))
  (libraries worker))
+
+(env (_ (js_of_ocaml (targets wasm))))

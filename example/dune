@@ -23,9 +23,14 @@
  (mode promote)
  (files worker/merlin_worker.bc.js))
 
+(copy_files
+ (mode promote)
+ (files worker/merlin_worker.bc.wasm))
+
 (alias
  (name all-js)
  (deps
    merlin_worker.bc.js
+   merlin_worker.bc.wasm
    app.bc.js
    dynamic.bc.js))

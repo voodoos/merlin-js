@@ -46,6 +46,12 @@ type action =
   | All_errors of source
   | Add_cmis of cmis
 
+let action_to_string = function
+  | All_errors _  -> "all_errors"
+  | Complete_prefix _ -> "complete_prefix"
+  | Type_enclosing _ -> "typed_enclosings"
+  | Add_cmis _ -> "add_cmis"
+
 type error = {
   kind : Location.report_kind;
   loc: Location.t;
@@ -70,6 +76,12 @@ type answer =
  | Typed_enclosings of
     (Location.t * [ `Index of int | `String of string ] * is_tail_position) list
  | Added_cmis
+
+let answer_to_string = function
+  | Errors _  -> "errors"
+  | Completions _ -> "completions"
+  | Typed_enclosings _ -> "typed_enclosings"
+  | Added_cmis -> "added_cmis"
 
 let report_source_to_string = function
   | Location.Lexer   -> "lexer"

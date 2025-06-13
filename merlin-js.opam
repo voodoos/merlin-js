@@ -16,12 +16,19 @@ depends: [
   "yojson" {>= "1.6.0"}
   "js_of_ocaml" {>= "5.0.0"}
   "js_of_ocaml-ppx" {>= "5.0.0"}
+  "wasm_of_ocaml-compiler" {>= "5.3.0-wasm"}
   "brr" {>= "0.0.4"}
   "ppx_blob" {>= "0.7.2"}
   "code-mirror"
 ]
 pin-depends: [
   ["code-mirror.dev" "git+https://github.com/patricoferris/jsoo-code-mirror#8fe48910e265ff87f9fc94ceb7b3d19fac102a96"]
+  ["dune.dev" "git+https://github.com/ocaml-wasm/dune#wasm"]
+  ["js_of_ocaml.5.3.0-wasm" "git+https://github.com/ocaml-wasm/wasm_of_ocaml#df5ccda854b21f11c5b7f6aed15ffd59b06182d3"]
+  ["js_of_ocaml-compiler.5.3.0-wasm" "git+https://github.com/ocaml-wasm/wasm_of_ocaml#df5ccda854b21f11c5b7f6aed15ffd59b06182d3"]
+  ["js_of_ocaml-ppx.5.3.0-wasm" "git+https://github.com/ocaml-wasm/wasm_of_ocaml#df5ccda854b21f11c5b7f6aed15ffd59b06182d3"]
+  ["js_of_ocaml-toplevel.5.3.0-wasm" "git+https://github.com/ocaml-wasm/wasm_of_ocaml#df5ccda854b21f11c5b7f6aed15ffd59b06182d3"]
+  ["wasm_of_ocaml-compiler.5.3.0-wasm" "git+https://github.com/ocaml-wasm/wasm_of_ocaml#df5ccda854b21f11c5b7f6aed15ffd59b06182d3"]
 ]
 synopsis:
   "Editor helper, provides completion, typing and source browsing for the web"

@@ -19,8 +19,10 @@ let make_worker url =
   let worker = { worker; queue } in
   let on_message m =
     let m = Ev.as_type m in
-    let data_marshaled : bytes = Brr_io.Message.Ev.data m in
-    let data : Protocol.answer = Marshal.from_bytes data_marshaled 0 in
+    let data_marshaled =
+      Brr_io.Message.Ev.data m |> Js_of_ocaml.Js.to_bytestring
+    in
+    let data : Protocol.answer = Marshal.from_string data_marshaled 0 in
     res_fut worker data
   in
   let _listener =
@@ -36,42 +38,53 @@ type errors = Protocol.error list
 
 let query ~action worker (*todo: other queries*) =
   let fut, set  = Fut.create () in
+  let message = Marshal.to_string action [] |> Js_of_ocaml.Js.bytestring in
+  Worker.post worker.worker message;
   add_fut worker set;
-  Worker.post worker.worker (Marshal.to_bytes action []);
+  Console.log ["Query:"; Protocol.action_to_string action];
   fut
 
 let query_errors worker (source : string) =
   let open Fut.Syntax in
   let action = Protocol.All_errors source in
   let+ data : Protocol.answer = query ~action worker in
-  Console.(log ["Received errors:";  data]);
+  Console.(log ["Received errors:";
+    Protocol.answer_to_string data;
+    data]);
   match data with
   | Protocol.Errors errors -> errors
-  | _ -> assert false
+  | _ -> []
 
 let query_completions worker (source : string) position =
   let open Fut.Syntax in
   let action = Protocol.Complete_prefix (source, position) in
   let+ data : Protocol.answer = query ~action worker in
-  Console.(log ["Received completions:";  data]);
+  Console.(log ["Received completions:";
+    Protocol.answer_to_string data;
+    data]);
   match data with
   | Protocol.Completions compl -> compl
-  | _ -> assert false
+  | _ -> { from = 0; to_=0; entries = []}
 
 let query_type worker (source : string) position =
   let open Fut.Syntax in
   let action = Protocol.Type_enclosing (source, position) in
   let+ data : Protocol.answer = query ~action worker in
-  Console.(log ["Received typed enclosings:";  data]);
+  Console.(log ["Received typed enclosings:";
+    Protocol.answer_to_string data;
+    data]);
   match data with
   | Protocol.Typed_enclosings l -> l
-  | _ -> assert false
+  | _ -> []
 
 let add_cmis worker cmis =
   let open Fut.Syntax in
   let action = Protocol.Add_cmis cmis in
   let+ data : Protocol.answer = query ~action worker in
-  Console.(log ["Received response from adding cmis:";  data]);
+  Console.(log [
+    "Received response from adding cmis:";
+    Protocol.answer_to_string data;
+    data]);
   match data with
   | Protocol.Added_cmis -> ()
-  | _ -> assert false
+  | _ -> ()
