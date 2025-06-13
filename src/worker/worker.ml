@@ -14,7 +14,7 @@ let sync_get url =
         Js.Opt.case
           (File.CoerceTo.arrayBuffer x##.response)
           (fun () ->
-            Firebug.console##log (Js.string "Failed to receive file");
+            Js_of_ocaml.Console.console##log (Js.string "Failed to receive file");
             None)
           (fun b -> Some (Typed_array.String.of_arrayBuffer b))
     | _ -> None
@@ -35,7 +35,6 @@ let add_dynamic_cmis dcs =
 
     let fetch =
       (fun filename ->
-        let open Option.Infix in
         let url = Filename.concat dcs.Protocol.dcs_url filename in
         sync_get url)
     in
@@ -234,7 +233,7 @@ let on_message marshaled_message =
         in
         let errors =
           dispatch source query
-          |> List.map ~f:(fun (Location.{kind; main=_ ; sub; source} as error) ->
+          |> List.map ~f:(fun (Location.{kind; main=_ ; sub; source; _} as error) ->
             let of_sub sub =
                 Location.print_sub_msg Format.str_formatter sub;
                 String.trim (Format.flush_str_formatter ())
