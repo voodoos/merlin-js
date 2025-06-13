@@ -1,0 +1,4 @@
+(copy_files
+ (alias all-js)
+ (mode (promote (until-clean)))
+ (files ../../src/worker/static/stdlib/*))
