@@ -230,7 +230,7 @@ let on_message = function
     in
     let errors =
       dispatch source query
-      |> List.map ~f:(fun (Location.{kind; main=_ ; sub; source; _} as error) ->
+      |> List.map ~f:(fun (Location.{kind; sub; source; _} as error) ->
         let of_sub sub =
             Location.print_sub_msg Format.str_formatter sub;
             String.trim (Format.flush_str_formatter ())
