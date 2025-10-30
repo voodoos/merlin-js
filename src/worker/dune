@@ -1,8 +1,6 @@
 (library
  (name worker)
  (public_name merlin-js.worker)
- (js_of_ocaml
-  (javascript_files stubs.js))
  (preprocess (pps js_of_ocaml-ppx))
  (libraries
   protocol
