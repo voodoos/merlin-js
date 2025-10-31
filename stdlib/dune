@@ -1,4 +1,14 @@
 (copy_files
  (alias all-js)
  (mode (promote (until-clean)))
- (files ../../src/worker/static/stdlib/*))
+ (files %{ocaml-config:standard_library}/*.cmi))
+
+(copy_files
+ (alias all-js)
+ (mode (promote (until-clean)))
+ (files %{ocaml-config:standard_library}/unix/*.cmi))
+
+(copy_files
+ (alias all-js)
+ (mode (promote (until-clean)))
+ (files %{ocaml-config:standard_library}/str/*.cmi))

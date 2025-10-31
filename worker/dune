@@ -2,5 +2,5 @@
  (name merlin_worker)
  (modules merlin_worker)
  (promote (until-clean))
- (modes js)
+ (modes js wasm)
  (libraries worker))
