@@ -1,12 +1,12 @@
 open Merlin_utils
 open Std
+open Js_of_ocaml
 open Merlin_kernel
 module Location = Ocaml_parsing.Location
 
 let stdlib_path = "/static/cmis"
 
 let sync_get url =
-    let open Js_of_ocaml in
     let x = XmlHttpRequest.create () in
     x##.responseType := Js.string "arraybuffer";
     x##_open (Js.string "GET") (Js.string url) Js._false;
@@ -16,7 +16,7 @@ let sync_get url =
         Js.Opt.case
           (File.CoerceTo.arrayBuffer x##.response)
           (fun () ->
-            Js_of_ocaml.Console.console##log (Js.string "Failed to receive file");
+            Console.console##log (Js.string "Failed to receive file");
             None)
           (fun b -> Some (Typed_array.String.of_arrayBuffer b))
     | _ -> None
@@ -46,7 +46,7 @@ let add_dynamic_cmis dcs =
       match fetch (filename_of_module name) with
       | Some content ->
         let name = Filename.(concat stdlib_path filename) in
-        Js_of_ocaml.Sys_js.create_file ~name ~content
+        Sys_js.create_file ~name ~content
       | None -> ()) dcs.dcs_toplevel_modules;
 
     let new_load ~allow_hidden ~unit_name =
@@ -62,7 +62,7 @@ let add_dynamic_cmis dcs =
       then begin
         match fetch filename with
         | Some x ->
-          Js_of_ocaml.Sys_js.create_file ~name:fs_name ~content:x;
+          Sys_js.create_file ~name:fs_name ~content:x;
           (* At this point we need to tell merlin that the dir contents
               have changed *)
           reset_dirs ()
@@ -78,7 +78,7 @@ let add_dynamic_cmis dcs =
     List.iter static_cmis ~f:(fun { Protocol.sc_name; sc_content } ->
       let filename = Printf.sprintf "%s.cmi" (String.uncapitalize_ascii sc_name) in
       let name = Filename.(concat stdlib_path filename) in
-      Js_of_ocaml.Sys_js.create_file ~name ~content:sc_content);
+      Sys_js.create_file ~name ~content:sc_content);
     Option.iter ~f:add_dynamic_cmis dynamic_cmis;
     Protocol.Added_cmis
 
@@ -252,8 +252,12 @@ let on_message = function
     add_cmis cmis
 
 let run () =
-  Js_of_ocaml.Worker.set_onmessage @@ fun marshaled_message ->
-  let action : Protocol.action = Marshal.from_bytes marshaled_message 0 in
+  Console.console##log (Js.string "Worker running");
+  Worker.set_onmessage @@ fun marshaled_message ->
+  Console.console##log (Js.string "Received message");
+  let action : Protocol.action =
+    let str = Js.to_bytestring marshaled_message in
+    Marshal.from_string str 0 in
   let res = on_message action in
-  let res = Marshal.to_bytes res [] in
-  Js_of_ocaml.Worker.post_message res
+  let res = Marshal.to_string res [] |> Js.bytestring in
+  Worker.post_message res

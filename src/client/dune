@@ -1,4 +1,4 @@
 (library
  (name merlin_client)
  (public_name merlin-js.client)
- (libraries protocol brr))
+ (libraries js_of_ocaml protocol brr))

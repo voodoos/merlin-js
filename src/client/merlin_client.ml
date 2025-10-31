@@ -70,7 +70,8 @@ module Webworker = struct
   include Brr_webworkers.Worker
 
   let post t action =
-    let bytes = Marshal.to_bytes action [] in
+    let bytes = Marshal.to_string action []
+    |> Js_of_ocaml.Js.bytestring in
     post t bytes
 end
 
@@ -80,8 +81,8 @@ let make_worker url =
   let worker = make_worker @@ Webworker.create @@ Jstr.of_string url in
   let on_message m =
     let m = Brr.Ev.as_type m in
-    let data_marshaled : bytes = Brr_io.Message.Ev.data m in
-    let data : Protocol.answer = Marshal.from_bytes data_marshaled 0 in
+    let data_marshaled = Brr_io.Message.Ev.data m |> Js_of_ocaml.Js.to_bytestring in
+    let data : Protocol.answer = Marshal.from_string data_marshaled 0 in
     on_message worker data
   in
   let _listen =
