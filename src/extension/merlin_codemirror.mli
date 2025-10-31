@@ -17,7 +17,7 @@ module type Config = sig
       downloaded on demand. *)
 end
 
-module Make : functor (Config : Config) -> sig
+module Make : functor (_ : Config) -> sig
 
   val autocomplete : Code_mirror.Extension.t
   (** An extension providing completions when typing *)
