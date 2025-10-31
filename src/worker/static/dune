@@ -11,5 +11,9 @@
 
 (rule
  (target static_files.ml)
- (deps (glob_files stdlib/*.cmi))
- (action (run ocaml %{dep:gen_static.ml})))
+ (deps
+  (glob_files %{ocaml-config:standard_library}/*.cmi)
+  (glob_files %{ocaml-config:standard_library}/unix/*.cmi)
+  (glob_files %{ocaml-config:standard_library}/str/*.cmi))
+ (action (run ocaml %{dep:gen_static.ml} %{deps})))
+
