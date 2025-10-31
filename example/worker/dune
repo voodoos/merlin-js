@@ -3,4 +3,14 @@
  (modules merlin_worker)
  (promote (until-clean))
  (modes js wasm)
- (libraries worker))
+ (preprocess (pps js_of_ocaml-ppx))
+ (libraries worker js_of_ocaml))
+
+
+(alias
+ (name all-js)
+ (deps
+   merlin_worker.bc.js
+   merlin_worker.bc.wasm.js
+   app.bc.js
+   dynamic.bc.js))
