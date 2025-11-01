@@ -14,6 +14,7 @@ module Extensions (Worker : Merlin_client.WORKER) = struct
   let linter worker = fun view ->
     let open Fut.Syntax in
     let doc = Utils.get_full_doc @@ Editor.View.state view in
+    let* worker = worker in
     let+ result = Merlin_client.query_errors worker doc in
     List.map (fun Protocol.{ kind; loc; main; sub = _; source } ->
       let from = loc.loc_start.pos_cnum in
@@ -47,6 +48,7 @@ module Extensions (Worker : Merlin_client.WORKER) = struct
     let source = Utils.get_full_doc @@ Autocomplete.Context.state ctx in
     let pos = Autocomplete.Context.pos ctx in
     let+ { from; to_; entries } =
+      let* worker = worker in
       Merlin_client.query_completions worker source (`Offset pos)
     in
     let options =
@@ -72,6 +74,7 @@ module Extensions (Worker : Merlin_client.WORKER) = struct
       let open Fut.Syntax in
       let doc = Utils.get_full_doc @@ Editor.View.state view in
       let pos = `Offset pos in
+      let* worker = worker in
       let+ result = Merlin_client.query_type worker doc pos in
       match result with
       | (loc, `String type_, _)::_ ->
@@ -100,8 +103,13 @@ end
 
 module Make (Config : Config) = struct
   let worker =
-    let worker = Merlin_client.make_worker Config.worker_url in
-    let _ = Merlin_client.add_cmis worker Config.cmis in
+    let open Fut.Syntax in
+    let worker, ready = Merlin_client.make_worker Config.worker_url in
+    let* () = ready in
+    (* Initial Cmi loading should be the first request. Todo: make it clearer in
+       the protocol that this is a mandatory initial exchange: Start worker ->
+       worker sends Ready -> client sends Add_cmis *)
+    let+ () = Merlin_client.add_cmis worker Config.cmis in
     worker
 
   open Extensions (Merlin_client.Webworker)

@@ -37,16 +37,16 @@ module Extensions (Worker : Merlin_client.WORKER) : sig
 
   type worker = Merlin_client.Make(Worker).worker
 
-  val autocomplete : worker -> Code_mirror.Extension.t
+  val autocomplete : worker Fut.t -> Code_mirror.Extension.t
   (** An extension providing completions when typing *)
 
-  val tooltip_on_hover : worker -> Code_mirror.Extension.t
+  val tooltip_on_hover : worker Fut.t -> Code_mirror.Extension.t
   (** An extension providing type-information when hovering code *)
 
-  val linter : worker -> Code_mirror.Extension.t
+  val linter : worker Fut.t -> Code_mirror.Extension.t
   (** An extension that highlights errors and warnings in the code *)
 
-  val all_extensions : worker -> Code_mirror.Extension.t array
+  val all_extensions : worker Fut.t -> Code_mirror.Extension.t array
   (** All the Merlin-specific extensions (does not include [ocaml]) *)
 
 end

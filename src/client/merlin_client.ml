@@ -79,14 +79,17 @@ include Make (Webworker)
 
 let make_worker url =
   let worker = make_worker @@ Webworker.create @@ Jstr.of_string url in
+  let ready, set_ready = Fut.create () in
   let on_message m =
     let m = Brr.Ev.as_type m in
     let data_marshaled = Brr_io.Message.Ev.data m |> Js_of_ocaml.Js.to_bytestring in
     let data : Protocol.answer = Marshal.from_string data_marshaled 0 in
-    on_message worker data
+    match data with
+    | Protocol.Ready -> set_ready ()
+    | _ -> on_message worker data
   in
   let _listen =
     Brr.Ev.listen Brr_io.Message.Ev.message on_message
     @@ Webworker.as_target worker.worker
   in
-  worker
+  worker, ready

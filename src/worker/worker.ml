@@ -5,6 +5,7 @@ open Merlin_kernel
 module Location = Ocaml_parsing.Location
 
 let stdlib_path = "/static/cmis"
+let log s = Console.console##log (Js.string s)
 
 let sync_get url =
     let x = XmlHttpRequest.create () in
@@ -251,13 +252,22 @@ let on_message = function
   | Add_cmis cmis ->
     add_cmis cmis
 
+let post res =
+  Marshal.to_string res []
+  |> Js.bytestring
+  |> Worker.post_message
+
 let run () =
   Console.console##log (Js.string "Worker running");
-  Worker.set_onmessage @@ fun marshaled_message ->
-  Console.console##log (Js.string "Received message");
-  let action : Protocol.action =
-    let str = Js.to_bytestring marshaled_message in
-    Marshal.from_string str 0 in
-  let res = on_message action in
-  let res = Marshal.to_string res [] |> Js.bytestring in
-  Worker.post_message res
+  Worker.set_onmessage (fun marshaled_message ->
+    let action : Protocol.action =
+      let str = Js.to_bytestring marshaled_message in
+      Marshal.from_string str 0
+    in
+    log @@ Printf.sprintf "Received message with action %S"
+      (Protocol.action_to_string action);
+    let res = on_message action in
+    log @@ Printf.sprintf "Sending message with answer %S"
+      (Protocol.answer_to_string res);
+    post res);
+  post Protocol.Ready
