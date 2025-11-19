@@ -35,7 +35,7 @@ module Make (Worker : WORKER) = struct
 
   let query_errors worker (source : string) =
     let open Fut.Syntax in
-    let action = Protocol.All_errors source in
+    let action = Protocol.All_errors (source, None) in
     let+ data : Protocol.answer = query ~action worker in
     match data with
     | Protocol.Errors errors -> errors
@@ -43,7 +43,7 @@ module Make (Worker : WORKER) = struct
 
   let query_completions worker (source : string) position =
     let open Fut.Syntax in
-    let action = Protocol.Complete_prefix (source, position) in
+    let action = Protocol.Complete_prefix (source, position, None) in
     let+ data : Protocol.answer = query ~action worker in
     match data with
     | Protocol.Completions compl -> compl
@@ -51,7 +51,7 @@ module Make (Worker : WORKER) = struct
 
   let query_type worker (source : string) position =
     let open Fut.Syntax in
-    let action = Protocol.Type_enclosing (source, position) in
+    let action = Protocol.Type_enclosing (source, position, None) in
     let+ data : Protocol.answer = query ~action worker in
     match data with
     | Protocol.Typed_enclosings l -> l

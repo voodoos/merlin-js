@@ -41,9 +41,9 @@ type cmis = {
 }
 
 type action =
-  | Complete_prefix of source * Msource.position
-  | Type_enclosing of source * Msource.position
-  | All_errors of source
+  | Complete_prefix of source * Msource.position * string option
+  | Type_enclosing of source * Msource.position * string option
+  | All_errors of source * string option
   | Add_cmis of cmis
 
 let action_to_string = function
