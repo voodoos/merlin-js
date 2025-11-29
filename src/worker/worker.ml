@@ -2,10 +2,14 @@ open Merlin_utils
 open Std
 open Js_of_ocaml
 open Merlin_kernel
+open Ocaml_typing.Cmi_format
 module Location = Ocaml_parsing.Location
 
 let stdlib_path = "/static/cmis"
 let log s = Console.console##log (Js.string s)
+
+type cmaybe = Cmi of cmi_infos | Url of string
+let cmi_store : (string, cmaybe) Hashtbl.t = Hashtbl.create 128
 
 let sync_get url =
     let x = XmlHttpRequest.create () in
@@ -25,62 +29,42 @@ let sync_get url =
 let filename_of_module unit_name =
   Printf.sprintf "%s.cmi" (String.uncapitalize_ascii unit_name)
 
-let reset_dirs () =
-  Ocaml_utils.Directory_content_cache.clear ();
-  let open Ocaml_utils.Load_path in
-  let { visible; hidden } = get_paths () in
-  reset ();
-  init ~auto_include:no_auto_include ~visible ~hidden
+let read_cmi_from_string s =
+  let open Ocaml_typing in
+  match String.chop_prefix ~prefix:Config.cmi_magic_number s with
+  | None -> log "Wrong magic number"; None
+  | Some rest ->
+    let rest = String.to_bytes rest in
+    let infos : Cmi_format.cmi_infos = Marshal.from_bytes rest 0 in
+    Some infos
 
-let add_dynamic_cmis dcs =
-    let open Ocaml_typing.Persistent_env.Persistent_signature in
-    let old_loader = !load in
+let persistent_sig_loader ~allow_hidden:_ ~unit_name =
+  let open Ocaml_typing.Persistent_env.Persistent_signature in
+  log @@ Printf.sprintf "Loading signature for %S" unit_name;
+  Hashtbl.find_opt cmi_store unit_name
+  |> Option.bind
+      ~f:(function Cmi infos ->
+            Some { filename = unit_name;
+                   cmi = infos;
+                   visibility = Visible }
+          | Url url -> Option.bind (sync_get url) ~f:(read_cmi_from_string) |> Option.map ~f:(fun cmi ->{ filename = unit_name;
+          cmi;
+          visibility = Visible }))
 
-    let fetch =
-      (fun filename ->
-        let url = Filename.concat dcs.Protocol.dcs_url filename in
-        sync_get url)
-    in
-
-    List.iter ~f:(fun name ->
-      let filename = filename_of_module name in
-      match fetch (filename_of_module name) with
-      | Some content ->
-        let name = Filename.(concat stdlib_path filename) in
-        Sys_js.create_file ~name ~content
-      | None -> ()) dcs.dcs_toplevel_modules;
-
-    let new_load ~allow_hidden ~unit_name =
-      let filename = filename_of_module unit_name in
-      let fs_name = Filename.(concat stdlib_path filename) in
-      (* Check if it's already been downloaded. This will be the
-         case for all toplevel cmis. Also check whether we're supposed
-         to handle this cmi *)
-      if
-        not (Sys.file_exists fs_name) &&
-        List.exists ~f:(fun prefix ->
-          String.starts_with ~prefix filename) dcs.dcs_file_prefixes
-      then begin
-        match fetch filename with
-        | Some x ->
-          Sys_js.create_file ~name:fs_name ~content:x;
-          (* At this point we need to tell merlin that the dir contents
-              have changed *)
-          reset_dirs ()
-        | None ->
-          Printf.eprintf "Warning: Expected to find cmi at: %s\n%!"
-            (Filename.concat dcs.Protocol.dcs_url filename)
-      end;
-      old_loader ~allow_hidden ~unit_name
-    in
-    load := new_load
 
   let add_cmis { Protocol.static_cmis; dynamic_cmis } =
     List.iter static_cmis ~f:(fun { Protocol.sc_name; sc_content } ->
-      let filename = Printf.sprintf "%s.cmi" (String.uncapitalize_ascii sc_name) in
-      let name = Filename.(concat stdlib_path filename) in
-      Sys_js.create_file ~name ~content:sc_content);
-    Option.iter ~f:add_dynamic_cmis dynamic_cmis;
+      let cmi_infos = read_cmi_from_string sc_content in
+      Option.iter cmi_infos ~f:(fun cmi_infos ->
+        Hashtbl.add cmi_store sc_name (Cmi cmi_infos)));
+        Option.iter dynamic_cmis ~f:(fun
+            { Protocol.dcs_url; dcs_toplevel_modules; dcs_file_prefixes } ->
+          List.iter dcs_toplevel_modules ~f:(fun name ->
+            List.iter dcs_file_prefixes ~f:(fun prefix ->
+              let filename = filename_of_module (prefix ^ name) in
+              let url = Filename.concat dcs_url filename in
+              log @@ Printf.sprintf "Known cmi for %s: %s %s" name filename url;
+              Hashtbl.add cmi_store name (Url url))));
     Protocol.Added_cmis
 
 let config =
@@ -259,6 +243,7 @@ let post res =
 
 let run () =
   Console.console##log (Js.string "Worker running");
+  Ocaml_typing.Persistent_env.Persistent_signature.load := persistent_sig_loader;
   Worker.set_onmessage (fun marshaled_message ->
     let action : Protocol.action =
       let str = Js.to_bytestring marshaled_message in
