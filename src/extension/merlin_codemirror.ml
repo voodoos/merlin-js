@@ -13,7 +13,7 @@ module Extensions (Worker : Merlin_client.WORKER) = struct
 
   let linter worker = fun view ->
     let open Fut.Syntax in
-    let doc = Utils.get_full_doc @@ Editor.View.state view in
+    let doc = Utils.get_full_doc @@ View.EditorView.state view in
     let* worker = worker in
     let+ result = Merlin_client.query_errors worker doc in
     List.map (fun Protocol.{ kind; loc; main; sub = _; source } ->
@@ -72,7 +72,7 @@ module Extensions (Worker : Merlin_client.WORKER) = struct
     hover_tooltip @@
     fun ~view ~pos ~side:_ ->
       let open Fut.Syntax in
-      let doc = Utils.get_full_doc @@ Editor.View.state view in
+      let doc = Utils.get_full_doc @@ View.EditorView.state view in
       let pos = `Offset pos in
       let* worker = worker in
       let+ result = Merlin_client.query_type worker doc pos in
@@ -89,11 +89,11 @@ module Extensions (Worker : Merlin_client.WORKER) = struct
 
   let linter worker = Lint.create (linter worker)
 
-  let all_extensions worker = [|
+  let all_extensions worker = [
     linter worker;
     autocomplete worker;
     tooltip_on_hover worker
-  |]
+  ]
 end
 
 module type Config = sig

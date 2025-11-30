@@ -5,5 +5,5 @@ let get_el_by_id i =
 
 
 let get_full_doc state =
-  let lines = Editor.(state |> State.doc |> Text.to_jstr_array) in
+  let lines = State.EditorState.(state |> doc |> State.Text.to_jstr_array) in
   lines |> Array.map Jstr.to_string |> Array.to_list |> String.concat "\n"
