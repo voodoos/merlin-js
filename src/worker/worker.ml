@@ -2,13 +2,13 @@ open Merlin_utils
 open Std
 open Js_of_ocaml
 open Merlin_kernel
-open Ocaml_typing.Cmi_format
+open Ocaml_typing
 module Location = Ocaml_parsing.Location
 
 let stdlib_path = "/static/cmis"
 let log s = Console.console##log (Js.string s)
 
-type cmaybe = Cmi of cmi_infos | Url of string
+type cmaybe = Cmi of Cmi_format.cmi_infos | Url of string
 let cmi_store : (string, cmaybe) Hashtbl.t = Hashtbl.create 128
 
 let sync_get url =
@@ -29,14 +29,20 @@ let sync_get url =
 let filename_of_module unit_name =
   Printf.sprintf "%s.cmi" (String.uncapitalize_ascii unit_name)
 
+type header = Misc.modname * Ocaml_typing.Types.signature_item list
+
 let read_cmi_from_string s =
-  let open Ocaml_typing in
+  let open Cmi_format in
   match String.chop_prefix ~prefix:Config.cmi_magic_number s with
   | None -> log "Wrong magic number"; None
   | Some rest ->
     let rest = String.to_bytes rest in
-    let infos : Cmi_format.cmi_infos = Marshal.from_bytes rest 0 in
-    Some infos
+    let (cmi_name, cmi_sign) : header = Marshal.from_bytes rest 0 in
+    let offset = Marshal.header_size + Marshal.data_size rest 0 in
+    let cmi_crcs : Misc.crcs = Marshal.from_bytes rest offset in
+    let offset = offset + Marshal.header_size + Marshal.data_size rest offset in
+    let cmi_flags : Cmi_format.pers_flags list = Marshal.from_bytes rest offset in
+    Some { cmi_name; cmi_sign; cmi_crcs; cmi_flags }
 
 let persistent_sig_loader ~allow_hidden:_ ~unit_name =
   let open Ocaml_typing.Persistent_env.Persistent_signature in
