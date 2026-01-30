@@ -11,6 +11,4 @@
  (name all-js)
  (deps
    merlin_worker.bc.js
-   merlin_worker.bc.wasm.js
-   app.bc.js
-   dynamic.bc.js))
+   merlin_worker.bc.wasm.js))

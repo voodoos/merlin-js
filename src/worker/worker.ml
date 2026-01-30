@@ -44,18 +44,31 @@ let read_cmi_from_string s =
     let cmi_flags : Cmi_format.pers_flags list = Marshal.from_bytes rest offset in
     Some { cmi_name; cmi_sign; cmi_crcs; cmi_flags }
 
+let cmi_load_url = ["stdlib/"]
+
 let persistent_sig_loader ~allow_hidden:_ ~unit_name =
   let open Ocaml_typing.Persistent_env.Persistent_signature in
   log @@ Printf.sprintf "Loading signature for %S" unit_name;
-  Hashtbl.find_opt cmi_store unit_name
-  |> Option.bind
-      ~f:(function Cmi infos ->
+  match Hashtbl.find_opt cmi_store unit_name with
+  | Some (Cmi infos) ->
             Some { filename = unit_name;
                    cmi = infos;
                    visibility = Visible }
-          | Url url -> Option.bind (sync_get url) ~f:(read_cmi_from_string) |> Option.map ~f:(fun cmi ->{ filename = unit_name;
+  | Some (Url url) -> Option.bind (sync_get url) ~f:(read_cmi_from_string) |> Option.map ~f:(fun cmi ->
+            Hashtbl.replace cmi_store unit_name (Cmi cmi);
+            { filename = unit_name;
           cmi;
-          visibility = Visible }))
+          visibility = Visible })
+  | None ->
+      List.find_mapi cmi_load_url ~f:(fun _ url ->
+        let filename = filename_of_module unit_name in
+        (* TODO use a specialize concat for urls *)
+        let url = Filename.concat url filename in
+        Option.bind (sync_get url) ~f:(read_cmi_from_string) |> Option.map ~f:(fun cmi ->
+          Hashtbl.replace cmi_store unit_name (Cmi cmi);
+          { filename = unit_name;
+        cmi;
+        visibility = Visible }))
 
 
   let add_cmis { Protocol.static_cmis; dynamic_cmis } =
@@ -64,13 +77,12 @@ let persistent_sig_loader ~allow_hidden:_ ~unit_name =
       Option.iter cmi_infos ~f:(fun cmi_infos ->
         Hashtbl.add cmi_store sc_name (Cmi cmi_infos)));
         Option.iter dynamic_cmis ~f:(fun
-            { Protocol.dcs_url; dcs_toplevel_modules; dcs_file_prefixes } ->
+            { Protocol.dcs_url; dcs_toplevel_modules; _ } ->
           List.iter dcs_toplevel_modules ~f:(fun name ->
-            List.iter dcs_file_prefixes ~f:(fun prefix ->
-              let filename = filename_of_module (prefix ^ name) in
-              let url = Filename.concat dcs_url filename in
-              log @@ Printf.sprintf "Known cmi for %s: %s %s" name filename url;
-              Hashtbl.add cmi_store name (Url url))));
+            let filename = filename_of_module name in
+            let url = Filename.concat dcs_url filename in
+            log @@ Printf.sprintf "Known cmi for %s: %s %s" name filename url;
+            Hashtbl.add cmi_store name (Url url)));
     Protocol.Added_cmis
 
 let config =
