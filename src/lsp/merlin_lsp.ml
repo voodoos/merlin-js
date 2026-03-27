@@ -75,6 +75,16 @@ let diagnostic_severity (kind : Ocaml_loc.report_kind) : DiagnosticSeverity.t =
   | Report_alert _ -> Information
   | Report_alert_as_error _ -> Error
 
+let source_of_report (report : Ocaml_loc.report) =
+  match report.source with
+  | Ocaml_loc.Lexer -> Some "Lexer"
+  | Ocaml_loc.Parser -> Some "Parser"
+  | Ocaml_loc.Typer -> Some "Typer"
+  | Ocaml_loc.Env -> Some "Env"
+  | Ocaml_loc.Config -> Some "Config"
+  | Ocaml_loc.Warning
+  | Ocaml_loc.Unknown -> None
+
 (* === LSP Server === *)
 
 class merlin_server =
@@ -131,7 +141,8 @@ class merlin_server =
                    Format.asprintf "@[%a@]" Ocaml_loc.print_main error
                    |> String.trim
                  in
-                 Diagnostic.create ~range ~severity ~message:(`String message) ())
+                 let source = source_of_report error in
+                 Diagnostic.create ~range ~severity ?source ~message:(`String message) ())
         with _ -> []
       in
       notify_back#send_diagnostic diagnostics;
