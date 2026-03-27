@@ -2,7 +2,6 @@ open Merlin_utils
 open Std
 open Merlin_kernel
 
-module Server = Linol.Make (Worker_io)
 module Ocaml_loc = Ocaml_parsing.Location
 module Lsp = Linol_lsp.Lsp
 
@@ -64,6 +63,8 @@ let diagnostic_of_report =
     in
     let source = source error in
     Diagnostic.create ~range ~severity ?source ~message:(`String message) ()
+
+module Server = Linol.Make (Worker_io)
 
 class merlin_server =
   object (self)
