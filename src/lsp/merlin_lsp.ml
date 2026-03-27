@@ -101,7 +101,7 @@ class merlin_server =
           ~default:(`TextDocumentSyncKind TextDocumentSyncKind.Full))
         ~signatureHelpProvider:
           (SignatureHelpOptions.create
-             ~triggerCharacters:["("; ","; " "]
+             ~triggerCharacters:[ " "; "~"; "?"; ":"; "(" ]
              ~retriggerCharacters:[")"; ";"; " "; "\n"; "="; "|"; "{"; "}"; "["; "]"]
              ())
         ()
