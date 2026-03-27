@@ -1,0 +1,11 @@
+opam-version: "2.0"
+maintainer:   "thevoodoos@gmail.com"
+authors:      "Ulysse Gérard"
+homepage:     "https://github.com/voodoos/merlin-js"
+bug-reports:  "https://github.com/voodoos/merlin-js/issues"
+dev-repo:     "git+https://github.com/voodoos/merlin-js.git"
+license:      "MIT"
+
+pin-depends: [
+  ["code-mirror.dev" "git+https://github.com/patricoferris/jsoo-code-mirror#8fe48910e265ff87f9fc94ceb7b3d19fac102a96"]
+]
