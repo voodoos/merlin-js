@@ -31,7 +31,7 @@ end
 
 module Ocaml_loc = Ocaml_parsing.Location
 module Lsp = Linol_lsp.Lsp
-module Jsonrpc2 = Linol.Jsonrpc2.Make (IO_direct)
+module Server = Linol.Server.Make (IO_direct)
 module Jsonrpc = Linol_jsonrpc.Jsonrpc
 
 open Lsp.Types
@@ -95,7 +95,7 @@ let diagnostic_of_report =
 
 class merlin_server =
   object (self)
-    inherit Jsonrpc2.server
+    inherit Server.server
 
     method spawn_query_handler f =
       try f ()
@@ -147,7 +147,7 @@ class merlin_server =
       notify_back#send_diagnostic diagnostics
 
     method! on_req_hover ~notify_back:_ ~id:_ ~uri:_ ~pos ~workDoneToken:_
-        (doc : Jsonrpc2.doc_state) =
+        (doc : Server.doc_state) =
       let source = Msource.make doc.content in
       let position = lsp_position_to_merlin pos in
       let query = Query_protocol.Type_enclosing (None, position, None) in
@@ -169,7 +169,7 @@ class merlin_server =
         with _ -> None )
 
     method! on_req_completion ~notify_back:_ ~id:_ ~uri:_ ~pos ~ctx:_
-        ~workDoneToken:_ ~partialResultToken:_ (doc : Jsonrpc2.doc_state) =
+        ~workDoneToken:_ ~partialResultToken:_ (doc : Server.doc_state) =
       let source = Msource.make doc.content in
       let position = lsp_position_to_merlin pos in
       let prefix = Merlin_jsoo.Completion.prefix_of_position source position in
@@ -291,7 +291,7 @@ let run () =
     Hashtbl.create 8
   in
   let server_request
-      (Jsonrpc2.Request_and_handler (req, handler)) =
+      (Server.Request_and_handler (req, handler)) =
     let id = `Int !next_id in
     incr next_id;
     let jsonrpc_req = Lsp.Server_request.to_jsonrpc_request req ~id in
