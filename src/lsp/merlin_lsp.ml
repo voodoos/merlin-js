@@ -64,15 +64,15 @@ let completion_kind (entry : Query_protocol.Compl.entry) : CompletionItemKind.t
   | `Keyword -> Keyword
 
 let diagnostic_of_report =
-  let diagnostic_severity (kind : Ocaml_loc.report_kind) : DiagnosticSeverity.t =
-    match kind with
+  let severity (report : Ocaml_loc.report) : DiagnosticSeverity.t =
+    match report.kind with
     | Report_error -> Error
     | Report_warning _ -> Warning
     | Report_warning_as_error _ -> Error
     | Report_alert _ -> Information
     | Report_alert_as_error _ -> Error
   in
-  let source_of_report (report : Ocaml_loc.report) =
+  let source (report : Ocaml_loc.report) =
     match report.source with
     | Ocaml_loc.Lexer -> Some "Lexer"
     | Ocaml_loc.Parser -> Some "Parser"
@@ -85,12 +85,12 @@ let diagnostic_of_report =
   fun (error : Ocaml_loc.report) ->
     let loc = Ocaml_loc.loc_of_report error in
     let range = loc_to_range loc in
-    let severity = diagnostic_severity error.kind in
+    let severity = severity error in
     let message =
       Format.asprintf "@[%a@]" Ocaml_loc.print_main error
       |> String.trim
     in
-    let source = source_of_report error in
+    let source = source error in
     Diagnostic.create ~range ~severity ?source ~message:(`String message) ()
 
 class merlin_server =
@@ -109,17 +109,19 @@ class merlin_server =
       Some (CompletionOptions.create ~triggerCharacters:[ "." ] ())
 
     method! config_modify_capabilities c =
+      let signatureHelpProvider =
+        SignatureHelpOptions.create
+          ~triggerCharacters:[ " "; "~"; "?"; ":"; "(" ]
+          ~retriggerCharacters:[")"; ";"; " "; "\n"; "="; "|"; "{"; "}"; "["; "]"]
+          ()
+      in
       ServerCapabilities.create
         ?codeLensProvider:c.codeLensProvider
         ?completionProvider:c.completionProvider
         ?hoverProvider:c.hoverProvider
         ~textDocumentSync:(Option.value c.textDocumentSync
           ~default:(`TextDocumentSyncKind TextDocumentSyncKind.Full))
-        ~signatureHelpProvider:
-          (SignatureHelpOptions.create
-             ~triggerCharacters:[ " "; "~"; "?"; ":"; "(" ]
-             ~retriggerCharacters:[")"; ";"; " "; "\n"; "="; "|"; "{"; "}"; "["; "]"]
-             ())
+        ~signatureHelpProvider
         ()
 
     method on_notif_doc_did_open ~notify_back _doc ~content =
@@ -142,8 +144,7 @@ class merlin_server =
           |> List.map ~f:diagnostic_of_report
         with _ -> []
       in
-      notify_back#send_diagnostic diagnostics;
-      ()
+      notify_back#send_diagnostic diagnostics
 
     method! on_req_hover ~notify_back:_ ~id:_ ~uri:_ ~pos ~workDoneToken:_
         (doc : Jsonrpc2.doc_state) =
