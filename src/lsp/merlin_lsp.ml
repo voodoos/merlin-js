@@ -259,23 +259,21 @@ let handle_add_cmis params =
        Merlin_jsoo.add_dynamic_cmis ~url ~toplevel_modules)
    with _ -> ())
 
+let post_json json =
+  let s = Yojson.Safe.to_string json in
+  Merlin_jsoo.log (Printf.sprintf "[lsp-server] >>> %s" s);
+  Worker.post_message (Js.string s)
+
+(* Send server notifications (diagnostics, log messages, etc.) to the client *)
+let notify_back (notif : Lsp.Server_notification.t) =
+  let n = Lsp.Server_notification.to_jsonrpc notif in
+  Merlin_jsoo.log (Printf.sprintf "[lsp-server] >>> notification %s" n.method_);
+  post_json (Jsonrpc.Notification.yojson_of_t n)
+
 let run () =
   Merlin_jsoo.init ();
 
   let server = new merlin_server in
-
-  let post_json json =
-    let s = Yojson.Safe.to_string json in
-    Merlin_jsoo.log (Printf.sprintf "[lsp-server] >>> %s" s);
-    Worker.post_message (Js.string s)
-  in
-
-  (* Send server notifications (diagnostics, log messages, etc.) to the client *)
-  let notify_back (notif : Lsp.Server_notification.t) =
-    let n = Lsp.Server_notification.to_jsonrpc notif in
-    Merlin_jsoo.log (Printf.sprintf "[lsp-server] >>> notification %s" n.method_);
-    post_json (Jsonrpc.Notification.yojson_of_t n)
-  in
 
   (* Send server-initiated requests to the client *)
   let next_id = ref 0 in
