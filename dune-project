@@ -13,7 +13,7 @@
    merlin-lib
    js_of_ocaml
    js_of_ocaml-ppx
-   wasm_of_ocaml
+   wasm_of_ocaml-compiler
    brr
    code-mirror
    yojson))
