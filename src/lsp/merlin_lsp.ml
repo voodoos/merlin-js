@@ -37,7 +37,7 @@ module Jsonrpc = Linol_jsonrpc.Jsonrpc
 open Lsp.Types
 open Js_of_ocaml
 
-(* === Position conversion === *)
+(* Compiler / Merlin types conversion to LSP *)
 
 let lsp_position_to_merlin (pos : Position.t) : Msource.position =
   `Logical (pos.line + 1, pos.character)
@@ -49,8 +49,6 @@ let loc_to_range (loc : Ocaml_loc.t) : Range.t =
       ~character:(max 0 (p.Lexing.pos_cnum - p.Lexing.pos_bol))
   in
   Range.create ~start:(pos loc.loc_start) ~end_:(pos loc.loc_end)
-
-(* === Completion kind mapping === *)
 
 let completion_kind (entry : Query_protocol.Compl.entry) : CompletionItemKind.t
     =
@@ -65,27 +63,35 @@ let completion_kind (entry : Query_protocol.Compl.entry) : CompletionItemKind.t
   | `MethodCall -> Method
   | `Keyword -> Keyword
 
-(* === Diagnostic severity mapping === *)
-
-let diagnostic_severity (kind : Ocaml_loc.report_kind) : DiagnosticSeverity.t =
-  match kind with
-  | Report_error -> Error
-  | Report_warning _ -> Warning
-  | Report_warning_as_error _ -> Error
-  | Report_alert _ -> Information
-  | Report_alert_as_error _ -> Error
-
-let source_of_report (report : Ocaml_loc.report) =
-  match report.source with
-  | Ocaml_loc.Lexer -> Some "Lexer"
-  | Ocaml_loc.Parser -> Some "Parser"
-  | Ocaml_loc.Typer -> Some "Typer"
-  | Ocaml_loc.Env -> Some "Env"
-  | Ocaml_loc.Config -> Some "Config"
-  | Ocaml_loc.Warning
-  | Ocaml_loc.Unknown -> None
-
-(* === LSP Server === *)
+let diagnostic_of_report =
+  let diagnostic_severity (kind : Ocaml_loc.report_kind) : DiagnosticSeverity.t =
+    match kind with
+    | Report_error -> Error
+    | Report_warning _ -> Warning
+    | Report_warning_as_error _ -> Error
+    | Report_alert _ -> Information
+    | Report_alert_as_error _ -> Error
+  in
+  let source_of_report (report : Ocaml_loc.report) =
+    match report.source with
+    | Ocaml_loc.Lexer -> Some "Lexer"
+    | Ocaml_loc.Parser -> Some "Parser"
+    | Ocaml_loc.Typer -> Some "Typer"
+    | Ocaml_loc.Env -> Some "Env"
+    | Ocaml_loc.Config -> Some "Config"
+    | Ocaml_loc.Warning
+    | Ocaml_loc.Unknown -> None
+  in
+  fun (error : Ocaml_loc.report) ->
+    let loc = Ocaml_loc.loc_of_report error in
+    let range = loc_to_range loc in
+    let severity = diagnostic_severity error.kind in
+    let message =
+      Format.asprintf "@[%a@]" Ocaml_loc.print_main error
+      |> String.trim
+    in
+    let source = source_of_report error in
+    Diagnostic.create ~range ~severity ?source ~message:(`String message) ()
 
 class merlin_server =
   object (self)
@@ -133,16 +139,7 @@ class merlin_server =
       let diagnostics =
         try
           Merlin_jsoo.dispatch source query
-          |> List.map ~f:(fun (error : Ocaml_loc.report) ->
-                 let loc = Ocaml_loc.loc_of_report error in
-                 let range = loc_to_range loc in
-                 let severity = diagnostic_severity error.kind in
-                 let message =
-                   Format.asprintf "@[%a@]" Ocaml_loc.print_main error
-                   |> String.trim
-                 in
-                 let source = source_of_report error in
-                 Diagnostic.create ~range ~severity ?source ~message:(`String message) ())
+          |> List.map ~f:diagnostic_of_report
         with _ -> []
       in
       notify_back#send_diagnostic diagnostics;
