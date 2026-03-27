@@ -266,9 +266,8 @@ let post_json json =
 
 (* Send server notifications (diagnostics, log messages, etc.) to the client *)
 let notify_back (notif : Lsp.Server_notification.t) =
-  let n = Lsp.Server_notification.to_jsonrpc notif in
-  Merlin_jsoo.log (Printf.sprintf "[lsp-server] >>> notification %s" n.method_);
-  post_json (Jsonrpc.Notification.yojson_of_t n)
+  let notif = Lsp.Server_notification.to_jsonrpc notif in
+  post_json (Jsonrpc.Notification.yojson_of_t notif)
 
 let run () =
   Merlin_jsoo.init ();
