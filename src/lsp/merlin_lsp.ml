@@ -342,27 +342,33 @@ class merlin_server =
                    ()
              with _ -> empty ))
       | _ -> Lwt.fail_with "unhandled request"
+
+    method! on_unknown_notification ~notify_back:_
+      (n : Linol_jsonrpc.Jsonrpc.Notification.t) =
+      if n.method_ = "merlin/addCmis" then begin
+        let open Yojson.Safe.Util in
+        (match n.params with
+         | Some params ->
+           let params = (params :> Yojson.Safe.t) in
+           (try
+              let statics = params |> member "staticCmis" |> to_list in
+              let cmis = List.map statics ~f:(fun j ->
+                (j |> member "name" |> to_string,
+                 j |> member "content" |> to_string)) in
+              Merlin_jsoo.add_static_cmis cmis
+            with Type_error _ -> ());
+           (try
+              let dynamics = params |> member "dynamicCmis" |> to_list in
+              List.iter dynamics ~f:(fun j ->
+                let url = j |> member "url" |> to_string in
+                let toplevel_modules = j |> member "toplevelModules" |> to_list
+                                       |> List.map ~f:to_string in
+                Merlin_jsoo.add_dynamic_cmis ~url ~toplevel_modules)
+            with Type_error _ -> ())
+         | None -> ())
+      end;
+      Lwt.return ()
   end
-
-(* === Custom notifications === *)
-
-let handle_add_cmis params =
-  let open Yojson.Safe.Util in
-  (try
-     let statics = params |> member "staticCmis" |> to_list in
-     let cmis = List.map statics ~f:(fun j ->
-       (j |> member "name" |> to_string,
-        j |> member "content" |> to_string)) in
-     Merlin_jsoo.add_static_cmis cmis
-   with Type_error _ -> ());
-  (try
-     let dynamics = params |> member "dynamicCmis" |> to_list in
-     List.iter dynamics ~f:(fun j ->
-       let url = j |> member "url" |> to_string in
-       let toplevel_modules = j |> member "toplevelModules" |> to_list
-                              |> List.map ~f:to_string in
-       Merlin_jsoo.add_dynamic_cmis ~url ~toplevel_modules)
-   with Type_error _ -> ())
 
 (* === Entry point === *)
 
@@ -373,26 +379,10 @@ let run () =
   let ic = IO_worker.create_in_channel () in
   let t = Server.create ~ic ~oc:() server in
 
-  (* Incoming worker messages: intercept custom notifications,
-     forward everything else to the linol server via the IO channel *)
   Worker.set_onmessage (fun msg ->
       let json_str = Js.to_string msg in
       Merlin_jsoo.log (Printf.sprintf "[lsp-server] <<< %s" json_str);
-      let is_add_cmis =
-        try
-          let json = Yojson.Safe.from_string json_str in
-          match Linol_jsonrpc.Jsonrpc.Packet.t_of_yojson json with
-          | Linol_jsonrpc.Jsonrpc.Packet.Notification notif
-            when notif.method_ = "merlin/addCmis" ->
-            (match notif.params with
-             | Some (`Assoc _ as params) -> handle_add_cmis params
-             | _ -> ());
-            true
-          | _ -> false
-        with _ -> false
-      in
-      if not is_add_cmis then
-        IO_worker.push_message ic json_str);
+      IO_worker.push_message ic json_str);
   Server.run t
 
 let () = Lwt.async run
