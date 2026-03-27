@@ -151,6 +151,7 @@ class merlin_server =
       let source = Msource.make doc.content in
       let position = lsp_position_to_merlin pos in
       let query = Query_protocol.Type_enclosing (None, position, None) in
+      (* TODO: documentation *)
       ( try
           match Merlin_jsoo.dispatch source query with
           | [] -> None
@@ -178,6 +179,7 @@ class merlin_server =
           let query =
             Query_protocol.Complete_prefix (prefix, position, [], true, true)
           in
+          (* TODO: documentation for completion items *)
           let (completions : Query_protocol.completions) =
             Merlin_jsoo.dispatch source query
           in
@@ -238,17 +240,14 @@ class merlin_server =
                  ~parameters:params
                  ~activeParameter:(Some result.active_param)
                  () in
-               let help = SignatureHelp.create
+               SignatureHelp.create
                  ~signatures:[sig_info]
                  ~activeSignature:result.active_signature
                  ~activeParameter:(Some result.active_param)
-                 () in
-               help
+                 ()
            with _ -> empty))
       | _ -> Stdlib.failwith "unhandled request"
   end
-
-(* === Worker-based JSON-RPC transport === *)
 
 let handle_add_cmis params =
   let open Yojson.Safe.Util in
@@ -258,7 +257,7 @@ let handle_add_cmis params =
        (j |> member "name" |> to_string,
         j |> member "content" |> to_string)) in
      Merlin_jsoo.add_static_cmis cmis
-   with _ -> ());
+   with Type_error _ -> ());
   (try
      let dynamics = params |> member "dynamicCmis" |> to_list in
      List.iter dynamics ~f:(fun j ->
@@ -266,7 +265,9 @@ let handle_add_cmis params =
        let toplevel_modules = j |> member "toplevelModules" |> to_list
                               |> List.map ~f:to_string in
        Merlin_jsoo.add_dynamic_cmis ~url ~toplevel_modules)
-   with _ -> ())
+   with Type_error _ -> ())
+
+(* Worker-based JSON-RPC transport *)
 
 let post_json json =
   let s = Yojson.Safe.to_string json in
