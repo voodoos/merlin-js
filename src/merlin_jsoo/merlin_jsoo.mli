@@ -25,11 +25,4 @@ module Completion : sig
     Msource.t ->
     Msource.position ->
     string
-
-  (** Return [(from_offset, to_offset, completions)] at the given position,
-      or [None] if the prefix is empty. *)
-  val at_pos :
-    Msource.t ->
-    Msource.position ->
-    (int * int * Query_protocol.completions) option
 end

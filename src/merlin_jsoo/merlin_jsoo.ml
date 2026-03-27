@@ -167,15 +167,4 @@ module Completion = struct
           | Some (_, s) -> s
           | None -> reconstructed_prefix
         else reconstructed_prefix
-
-  let at_pos source position =
-    let prefix = prefix_of_position source position in
-    let `Offset to_ = Msource.get_offset source position in
-    let from =
-      to_ - String.length (prefix_of_position ~short_path:true source position)
-    in
-    if prefix = "" then None
-    else
-      let query = Query_protocol.Complete_prefix (prefix, position, [], true, true) in
-      Some (from, to_, dispatch source query)
 end
