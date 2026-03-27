@@ -1,22 +1,15 @@
 open Merlin_utils
 open Std
 open Merlin_kernel
-module Location = Ocaml_parsing.Location
 
-(* === js_of_ocaml-compatible IO module for linol (no lwt.unix) === *)
+module IO_direct = struct
+  type 'a t = 'a
 
-module IO_jsoo = struct
-  type 'a t = 'a Lwt.t
-
-  let return = Lwt.return
-  let failwith = Lwt.fail_with
-  let ( let+ ) = Lwt.( >|= )
-  let ( let* ) = Lwt.( >>= )
-
-  let ( and+ ) a b =
-    let open Lwt in
-    a >>= fun x ->
-    b >|= fun y -> (x, y)
+  let return x = x
+  let failwith = Stdlib.failwith
+  let ( let+ ) x f = f x
+  let ( let* ) x f = f x
+  let ( and+ ) a b = (a, b)
 
   type env = unit
   type in_channel = unit
@@ -24,38 +17,37 @@ module IO_jsoo = struct
 
   let stdin () = ()
   let stdout () = ()
-  let read () _ _ _ = Lwt.fail_with "IO_jsoo: no stdin"
-  let read_line () = Lwt.fail_with "IO_jsoo: no stdin"
-  let write () _ _ _ = Lwt.fail_with "IO_jsoo: no stdout"
-  let write_string () _ = Lwt.fail_with "IO_jsoo: no stdout"
+  let read () _ _ _ = Stdlib.failwith "IO_direct: no stdin"
+  let read_line () = Stdlib.failwith "IO_direct: no stdin"
+  let write () _ _ _ = Stdlib.failwith "IO_direct: no stdout"
+  let write_string () _ = Stdlib.failwith "IO_direct: no stdout"
 
-  let fail e _bt = Lwt.fail e
+  let fail e _bt = raise e
 
   let catch f g =
     let bt = Printexc.get_callstack 10 in
-    Lwt.catch f (fun exn -> g exn bt)
+    try f () with exn -> g exn bt
 end
 
-module Jsonrpc2 = Linol.Jsonrpc2.Make (IO_jsoo)
+module Ocaml_loc = Ocaml_parsing.Location
+module Lsp = Linol_lsp.Lsp
+module Jsonrpc2 = Linol.Jsonrpc2.Make (IO_direct)
+module Jsonrpc = Linol_jsonrpc.Jsonrpc
 
-(* === Type aliases from linol's vendored lsp === *)
-
-module L = Linol_lsp.Lsp.Types
-module Jsonrpc_ = Linol_jsonrpc.Jsonrpc
-module Lsp_ = Linol_lsp.Lsp
+open Lsp.Types
 
 (* === Position conversion === *)
 
-let lsp_position_to_merlin (pos : L.Position.t) : Msource.position =
+let lsp_position_to_merlin (pos : Position.t) : Msource.position =
   `Logical (pos.line + 1, pos.character)
 
-let loc_to_range (loc : Location.t) : L.Range.t =
+let loc_to_range (loc : Ocaml_loc.t) : Range.t =
   let pos p =
-    L.Position.create
+    Position.create
       ~line:(max 0 (p.Lexing.pos_lnum - 1))
       ~character:(max 0 (p.Lexing.pos_cnum - p.Lexing.pos_bol))
   in
-  L.Range.create ~start:(pos loc.loc_start) ~end_:(pos loc.loc_end)
+  Range.create ~start:(pos loc.loc_start) ~end_:(pos loc.loc_end)
 
 (* === CMI loading (from worker.ml) === *)
 
@@ -221,7 +213,7 @@ let prefix_of_position ?(short_path = false) source position =
 
 (* === Completion kind mapping === *)
 
-let completion_kind (entry : Query_protocol.Compl.entry) : L.CompletionItemKind.t
+let completion_kind (entry : Query_protocol.Compl.entry) : CompletionItemKind.t
     =
   match entry.kind with
   | `Value -> Value
@@ -236,7 +228,7 @@ let completion_kind (entry : Query_protocol.Compl.entry) : L.CompletionItemKind.
 
 (* === Diagnostic severity mapping === *)
 
-let diagnostic_severity (kind : Location.report_kind) : L.DiagnosticSeverity.t =
+let diagnostic_severity (kind : Ocaml_loc.report_kind) : DiagnosticSeverity.t =
   match kind with
   | Report_error -> Error
   | Report_warning _ -> Warning
@@ -251,26 +243,25 @@ class merlin_server =
     inherit Jsonrpc2.server
 
     method spawn_query_handler f =
-      Lwt.async (fun () ->
-          Lwt.catch f (fun exn ->
-              Printf.eprintf "uncaught exception in handler:\n%s\n%!"
-                (Printexc.to_string exn);
-              Lwt.return ()))
+      try f ()
+      with exn ->
+        Printf.eprintf "uncaught exception in handler:\n%s\n%!"
+          (Printexc.to_string exn)
 
     method! config_hover = Some (`Bool true)
 
     method! config_completion =
-      Some (L.CompletionOptions.create ~triggerCharacters:[ "." ] ())
+      Some (CompletionOptions.create ~triggerCharacters:[ "." ] ())
 
     method! config_modify_capabilities c =
-      L.ServerCapabilities.create
+      ServerCapabilities.create
         ?codeLensProvider:c.codeLensProvider
         ?completionProvider:c.completionProvider
         ?hoverProvider:c.hoverProvider
         ~textDocumentSync:(Option.value c.textDocumentSync
-          ~default:(`TextDocumentSyncKind L.TextDocumentSyncKind.Full))
+          ~default:(`TextDocumentSyncKind TextDocumentSyncKind.Full))
         ~signatureHelpProvider:
-          (L.SignatureHelpOptions.create
+          (SignatureHelpOptions.create
              ~triggerCharacters:["("; ","; " "]
              ~retriggerCharacters:[")"; ";"; " "; "\n"; "="; "|"; "{"; "}"; "["; "]"]
              ())
@@ -283,7 +274,7 @@ class merlin_server =
         ~new_content =
       self#publish_diagnostics ~notify_back new_content
 
-    method on_notif_doc_did_close ~notify_back:_ _doc = Lwt.return ()
+    method on_notif_doc_did_close ~notify_back:_ _doc = ()
 
     method private publish_diagnostics ~notify_back content =
       let source = Msource.make content in
@@ -293,18 +284,19 @@ class merlin_server =
       let diagnostics =
         try
           dispatch source query
-          |> List.map ~f:(fun (error : Location.report) ->
-                 let loc = Location.loc_of_report error in
+          |> List.map ~f:(fun (error : Ocaml_loc.report) ->
+                 let loc = Ocaml_loc.loc_of_report error in
                  let range = loc_to_range loc in
                  let severity = diagnostic_severity error.kind in
                  let message =
-                   Format.asprintf "@[%a@]" Location.print_main error
+                   Format.asprintf "@[%a@]" Ocaml_loc.print_main error
                    |> String.trim
                  in
-                 L.Diagnostic.create ~range ~severity ~message:(`String message) ())
+                 Diagnostic.create ~range ~severity ~message:(`String message) ())
         with _ -> []
       in
-      notify_back#send_diagnostic diagnostics
+      notify_back#send_diagnostic diagnostics;
+      ()
 
     method! on_req_hover ~notify_back:_ ~id:_ ~uri:_ ~pos ~workDoneToken:_
         (doc : Jsonrpc2.doc_state) =
@@ -313,26 +305,26 @@ class merlin_server =
       let query = Query_protocol.Type_enclosing (None, position, None) in
       ( try
           match dispatch source query with
-          | [] -> Lwt.return None
+          | [] -> None
           | (loc, `String typ, _) :: _ ->
               let value = Printf.sprintf "```ocaml\n%s\n```" typ in
               let contents =
-                L.MarkupContent.create ~kind:L.MarkupKind.Markdown ~value
+                MarkupContent.create ~kind:MarkupKind.Markdown ~value
               in
               let range = loc_to_range loc in
               let hover =
-                L.Hover.create ~contents:(`MarkupContent contents) ~range ()
+                Hover.create ~contents:(`MarkupContent contents) ~range ()
               in
-              Lwt.return (Some hover)
-          | _ -> Lwt.return None
-        with _ -> Lwt.return None )
+              Some hover
+          | _ -> None
+        with _ -> None )
 
     method! on_req_completion ~notify_back:_ ~id:_ ~uri:_ ~pos ~ctx:_
         ~workDoneToken:_ ~partialResultToken:_ (doc : Jsonrpc2.doc_state) =
       let source = Msource.make doc.content in
       let position = lsp_position_to_merlin pos in
       let prefix = prefix_of_position source position in
-      if prefix = "" then Lwt.return None
+      if prefix = "" then None
       else
         try
           let query =
@@ -345,23 +337,23 @@ class merlin_server =
             List.map completions.entries
               ~f:(fun (entry : Query_protocol.Compl.entry) ->
                 let kind = completion_kind entry in
-                L.CompletionItem.create ~label:entry.name ~kind
+                CompletionItem.create ~label:entry.name ~kind
                   ~detail:entry.desc ())
           in
           let list =
-            L.CompletionList.create ~isIncomplete:false ~items ()
+            CompletionList.create ~isIncomplete:false ~items ()
           in
-          Lwt.return (Some (`CompletionList list))
-        with _ -> Lwt.return None
+          Some (`CompletionList list)
+        with _ -> None
 
     method! on_request_unhandled ~notify_back:_ ~id:_
-        (type a) (r : a Lsp_.Client_request.t) : a Lwt.t =
+        (type a) (r : a Lsp.Client_request.t) : a =
       match r with
-      | Lsp_.Client_request.SignatureHelp params ->
+      | Lsp.Client_request.SignatureHelp params ->
         let uri = params.textDocument.uri in
-        let empty = L.SignatureHelp.create ~signatures:[] () in
+        let empty = SignatureHelp.create ~signatures:[] () in
         (match self#find_doc uri with
-         | None -> Lwt.return empty
+         | None -> empty
          | Some doc ->
            let source = Msource.make doc.content in
            let position = lsp_position_to_merlin params.position in
@@ -387,25 +379,25 @@ class merlin_server =
            } in
            (try
              match dispatch source query with
-             | None -> Lwt.return empty
+             | None -> empty
              | Some result ->
                let params = List.map result.parameters
                  ~f:(fun (p : Query_protocol.signature_help_param) ->
-                   L.ParameterInformation.create
+                   ParameterInformation.create
                      ~label:(`Offset (p.label_start, p.label_end)) ()) in
-               let sig_info = L.SignatureInformation.create
+               let sig_info = SignatureInformation.create
                  ~label:result.label
                  ~parameters:params
                  ~activeParameter:(Some result.active_param)
                  () in
-               let help = L.SignatureHelp.create
+               let help = SignatureHelp.create
                  ~signatures:[sig_info]
                  ~activeSignature:result.active_signature
                  ~activeParameter:(Some result.active_param)
                  () in
-               Lwt.return help
-           with _ -> Lwt.return empty))
-      | _ -> Lwt.fail_with "unhandled request"
+               help
+           with _ -> empty))
+      | _ -> Stdlib.failwith "unhandled request"
   end
 
 (* === Worker-based JSON-RPC transport === *)
@@ -444,32 +436,31 @@ let run () =
   in
 
   (* Send server notifications (diagnostics, log messages, etc.) to the client *)
-  let notify_back (notif : Lsp_.Server_notification.t) =
-    let n = Lsp_.Server_notification.to_jsonrpc notif in
+  let notify_back (notif : Lsp.Server_notification.t) =
+    let n = Lsp.Server_notification.to_jsonrpc notif in
     log (Printf.sprintf "[lsp-server] >>> notification %s" n.method_);
-    post_json (Jsonrpc_.Notification.yojson_of_t n);
-    Lwt.return ()
+    post_json (Jsonrpc.Notification.yojson_of_t n)
   in
 
   (* Send server-initiated requests to the client *)
   let next_id = ref 0 in
   let pending :
-      (Jsonrpc_.Id.t, Jsonrpc_.Response.t -> unit Lwt.t) Hashtbl.t =
+      (Jsonrpc.Id.t, Jsonrpc.Response.t -> unit) Hashtbl.t =
     Hashtbl.create 8
   in
   let server_request
       (Jsonrpc2.Request_and_handler (req, handler)) =
     let id = `Int !next_id in
     incr next_id;
-    let jsonrpc_req = Lsp_.Server_request.to_jsonrpc_request req ~id in
-    Hashtbl.replace pending id (fun (resp : Jsonrpc_.Response.t) ->
+    let jsonrpc_req = Lsp.Server_request.to_jsonrpc_request req ~id in
+    Hashtbl.replace pending id (fun (resp : Jsonrpc.Response.t) ->
         match resp.result with
         | Ok json ->
-            let result = Lsp_.Server_request.response_of_json req json in
+            let result = Lsp.Server_request.response_of_json req json in
             handler (Ok result)
         | Error err -> handler (Error err));
-    post_json (Jsonrpc_.Request.yojson_of_t jsonrpc_req);
-    Lwt.return id
+    post_json (Jsonrpc.Request.yojson_of_t jsonrpc_req);
+    id
   in
 
   (* Handle incoming JSON-RPC messages from the client *)
@@ -477,54 +468,49 @@ let run () =
       let json_str = Js.to_string msg in
       log (Printf.sprintf "[lsp-server] <<< %s" json_str);
       let json = Yojson.Safe.from_string json_str in
-      let packet = Jsonrpc_.Packet.t_of_yojson json in
-      Lwt.async (fun () ->
-          match packet with
-          | Jsonrpc_.Packet.Notification notif ->
-              if notif.method_ = "merlin/addCmis" then (
-                (match notif.params with
-                 | Some (`Assoc _ as params) -> handle_add_cmis params
-                 | _ -> ());
-                Lwt.return ())
-              else (
-              match Lsp_.Client_notification.of_jsonrpc notif with
-              | Ok n ->
-                  server#on_notification ~notify_back ~server_request n
-              | Error _ -> Lwt.return ())
-          | Jsonrpc_.Packet.Request req -> (
-              match Lsp_.Client_request.of_jsonrpc req with
-              | Ok (Lsp_.Client_request.E r) ->
-                  let open Lwt.Syntax in
-                  let* result =
-                    server#on_request ~notify_back ~server_request
-                      ~id:req.id r
-                  in
-                  let response =
-                    match result with
-                    | Ok value ->
-                        Jsonrpc_.Response.ok req.id
-                          (Lsp_.Client_request.yojson_of_result r value)
-                    | Error msg ->
-                        Jsonrpc_.Response.error req.id
-                          (Jsonrpc_.Response.Error.make
-                             ~code:InternalError ~message:msg ())
-                  in
-                  post_json (Jsonrpc_.Response.yojson_of_t response);
-                  Lwt.return ()
-              | Error msg ->
-                  let response =
-                    Jsonrpc_.Response.error req.id
-                      (Jsonrpc_.Response.Error.make ~code:InvalidRequest
-                         ~message:msg ())
-                  in
-                  post_json (Jsonrpc_.Response.yojson_of_t response);
-                  Lwt.return ())
-          | Jsonrpc_.Packet.Response resp -> (
-              match Hashtbl.find_opt pending resp.id with
-              | Some handler ->
-                  Hashtbl.remove pending resp.id;
-                  handler resp
-              | None -> Lwt.return ())
-          | _ -> Lwt.return ()))
+      let packet = Jsonrpc.Packet.t_of_yojson json in
+      match packet with
+      | Jsonrpc.Packet.Notification notif ->
+          if notif.method_ = "merlin/addCmis" then (
+            match notif.params with
+            | Some (`Assoc _ as params) -> handle_add_cmis params
+            | _ -> ())
+          else (
+          match Lsp.Client_notification.of_jsonrpc notif with
+          | Ok n ->
+              server#on_notification ~notify_back ~server_request n
+          | Error _ -> ())
+      | Jsonrpc.Packet.Request req -> (
+          match Lsp.Client_request.of_jsonrpc req with
+          | Ok (Lsp.Client_request.E r) ->
+              let result =
+                server#on_request ~notify_back ~server_request
+                  ~id:req.id r
+              in
+              let response =
+                match result with
+                | Ok value ->
+                    Jsonrpc.Response.ok req.id
+                      (Lsp.Client_request.yojson_of_result r value)
+                | Error msg ->
+                    Jsonrpc.Response.error req.id
+                      (Jsonrpc.Response.Error.make
+                         ~code:InternalError ~message:msg ())
+              in
+              post_json (Jsonrpc.Response.yojson_of_t response)
+          | Error msg ->
+              let response =
+                Jsonrpc.Response.error req.id
+                  (Jsonrpc.Response.Error.make ~code:InvalidRequest
+                     ~message:msg ())
+              in
+              post_json (Jsonrpc.Response.yojson_of_t response))
+      | Jsonrpc.Packet.Response resp -> (
+          match Hashtbl.find_opt pending resp.id with
+          | Some handler ->
+              Hashtbl.remove pending resp.id;
+              handler resp
+          | None -> ())
+      | _ -> ())
 
 let ()=  run ()
