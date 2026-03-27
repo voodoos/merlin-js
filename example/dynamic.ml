@@ -2,7 +2,7 @@ open Code_mirror
 
 module Merlin =
   Merlin_codemirror.Make (struct
-    let worker_url = "worker/merlin_worker.bc.wasm.js"
+    let worker_url = "workers/merlin_worker.bc.wasm.js"
     let cmis =
       let dcs_toplevel_modules = [
         "CamlinternalAtomic";

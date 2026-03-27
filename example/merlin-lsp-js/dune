@@ -1,0 +1,6 @@
+(rule
+ (alias all-js)
+ (deps main.js package.json)
+ (targets merlin-lsp.js)
+ (mode (promote (until-clean)))
+ (action (progn (run yarn install) (run yarn build))))

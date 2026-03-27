@@ -1,8 +1,6 @@
 
-(executable
+(library
  (name merlin_lsp)
- (promote (until-clean))
- (modes js wasm)
  (preprocess (pps js_of_ocaml-ppx))
  (js_of_ocaml (javascript_files thread_stubs.js))
  (libraries

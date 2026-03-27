@@ -266,5 +266,3 @@ let run () =
       Merlin_jsoo.log (Printf.sprintf "[lsp-server] <<< %s" json_str);
       Worker_io.push_message ic json_str);
   Server.run t
-
-let () = Lwt.async run
