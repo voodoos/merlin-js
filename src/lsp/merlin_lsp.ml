@@ -306,6 +306,8 @@ let run () =
   in
 
   (* Handle incoming JSON-RPC messages from the client *)
+  (* This is a bit low-level, we could maybe work with a Jsonrpc2 server and
+  some lwt synchronisation primitive in the IO implementation. *)
   Worker.set_onmessage (fun msg ->
       let json_str = Js.to_string msg in
       Merlin_jsoo.log (Printf.sprintf "[lsp-server] <<< %s" json_str);
