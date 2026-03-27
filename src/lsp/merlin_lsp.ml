@@ -2,37 +2,128 @@ open Merlin_utils
 open Std
 open Merlin_kernel
 
-module IO_direct = struct
-  type 'a t = 'a
+(* === Lwt-based IO module for linol, backed by web worker messages === *)
 
-  let return x = x
-  let failwith = Stdlib.failwith
-  let ( let+ ) x f = f x
-  let ( let* ) x f = f x
-  let ( and+ ) a b = (a, b)
+module IO_worker = struct
+  type 'a t = 'a Lwt.t
 
-  type env = unit
-  type in_channel = unit
-  type out_channel = unit
+  let return = Lwt.return
+  let failwith = Lwt.fail_with
+  let ( let+ ) = Lwt.( >|= )
+  let ( let* ) = Lwt.( >>= )
+  let ( and+ ) a b =
+    let open Lwt in
+    a >>= fun x -> b >|= fun y -> (x, y)
 
-  let stdin () = ()
-  let stdout () = ()
-  let read () _ _ _ = Stdlib.failwith "IO_direct: no stdin"
-  let read_line () = Stdlib.failwith "IO_direct: no stdin"
-  let write () _ _ _ = Stdlib.failwith "IO_direct: no stdout"
-  let write_string () _ = Stdlib.failwith "IO_direct: no stdout"
-
-  let fail e _bt = raise e
+  let fail e _bt = Lwt.fail e
 
   let catch f g =
     let bt = Printexc.get_callstack 10 in
-    try f () with exn -> g exn bt
+    Lwt.catch f (fun exn -> g exn bt)
+
+  (* Message queue: incoming JSON strings from the worker *)
+  type msg_queue = {
+    queue : string Queue.t;
+    mutable waiter : string Lwt.u option;
+  }
+
+  let pop_msg q =
+    if not (Queue.is_empty q.queue) then
+      Lwt.return (Queue.pop q.queue)
+    else
+      let p, w = Lwt.wait () in
+      q.waiter <- Some w;
+      p
+
+  (* Input channel: reads from a buffer, refilled from worker messages
+     with LSP Content-Length framing added *)
+  type in_channel = {
+    q : msg_queue;
+    mutable buf : string;
+    mutable pos : int;
+  }
+
+  let create_in_channel () =
+    { q = { queue = Queue.create (); waiter = None };
+      buf = ""; pos = 0 }
+
+  let push_message ic msg =
+    let q = ic.q in
+    match q.waiter with
+    | Some w -> q.waiter <- None; Lwt.wakeup w msg
+    | None -> Queue.push msg q.queue
+
+  (* Ensure the buffer has data, fetching and framing the next message if needed *)
+  let ensure_data ic =
+    if ic.pos < String.length ic.buf then Lwt.return_unit
+    else
+      let+ msg = pop_msg ic.q in
+      let framed =
+        Printf.sprintf "Content-Length: %d\r\n\r\n%s"
+          (String.length msg) msg
+      in
+      ic.buf <- framed;
+      ic.pos <- 0
+
+  let read_line ic =
+    let* () = ensure_data ic in
+    match String.index_from_opt ic.buf ic.pos '\n' with
+    | Some i ->
+      let line = String.sub ic.buf ~pos:ic.pos ~len:(i - ic.pos) in
+      ic.pos <- i + 1;
+      Lwt.return line
+    | None ->
+      let line =
+        String.sub ic.buf ~pos:ic.pos
+          ~len:(Stdlib.String.length ic.buf - ic.pos)
+      in
+      ic.pos <- String.length ic.buf;
+      Lwt.return line
+
+  let read ic buf off len =
+    let rec loop off remaining =
+      if remaining = 0 then Lwt.return_unit
+      else
+        let* () = ensure_data ic in
+        let avail = Stdlib.String.length ic.buf - ic.pos in
+        let n = min avail remaining in
+        Bytes.blit_string ic.buf ic.pos buf off n;
+        ic.pos <- ic.pos + n;
+        loop (off + n) (remaining - n)
+    in
+    loop off len
+
+  (* Output channel: strips LSP framing and posts JSON via Worker *)
+  type out_channel = unit
+
+  let write () _ _ _ = Lwt.fail_with "IO_worker: raw write not used"
+
+  let write_string () s =
+    (* Linol writes "Content-Length: N\r\n\r\nJSON" in one call.
+       Find the header/body separator and post just the JSON. *)
+    let sep = "\r\n\r\n" in
+    let sep_len = String.length sep in
+    let s_len = String.length s in
+    let rec find i =
+      if i + sep_len > s_len then ()
+      else if String.sub s ~pos:i ~len:sep_len = sep then begin
+        let json_str = String.sub s ~pos:(i + sep_len) ~len:(s_len - i - sep_len) in
+        Merlin_jsoo.log (Printf.sprintf "[lsp-server] >>> %s" json_str);
+        Js_of_ocaml.Worker.post_message (Js_of_ocaml.Js.string json_str)
+      end else
+        find (i + 1)
+    in
+    find 0;
+    Lwt.return_unit
+
+  type env = unit
+  let stdin () = Stdlib.failwith "IO_worker: use create_in_channel"
+  let stdout () = ()
 end
 
+module Server = Linol.Jsonrpc2.Make (IO_worker)
 module Ocaml_loc = Ocaml_parsing.Location
 module Lsp = Linol_lsp.Lsp
-module Server = Linol.Server.Make (IO_direct)
-module Jsonrpc = Linol_jsonrpc.Jsonrpc
 
 open Lsp.Types
 open Js_of_ocaml
@@ -98,10 +189,11 @@ class merlin_server =
     inherit Server.server
 
     method spawn_query_handler f =
-      try f ()
-      with exn ->
-        Printf.eprintf "uncaught exception in handler:\n%s\n%!"
-          (Printexc.to_string exn)
+      Lwt.async (fun () ->
+          Lwt.catch f (fun exn ->
+              Printf.eprintf "uncaught exception in handler:\n%s\n%!"
+                (Printexc.to_string exn);
+              Lwt.return ()))
 
     method! config_hover = Some (`Bool true)
 
@@ -131,7 +223,7 @@ class merlin_server =
         ~new_content =
       self#publish_diagnostics ~notify_back new_content
 
-    method on_notif_doc_did_close ~notify_back:_ _doc = ()
+    method on_notif_doc_did_close ~notify_back:_ _doc = Lwt.return ()
 
     method private publish_diagnostics ~notify_back content =
       let source = Msource.make content in
@@ -151,7 +243,7 @@ class merlin_server =
       let source = Msource.make doc.content in
       let position = lsp_position_to_merlin pos in
       let query = Query_protocol.Type_enclosing (None, position, None) in
-      (* TODO: documentation *)
+      Lwt.return
       ( try
           match Merlin_jsoo.dispatch source query with
           | [] -> None
@@ -162,6 +254,7 @@ class merlin_server =
               in
               let range = loc_to_range loc in
               let hover =
+                (* TODO also return documentation *)
                 Hover.create ~contents:(`MarkupContent contents) ~range ()
               in
               Some hover
@@ -173,37 +266,38 @@ class merlin_server =
       let source = Msource.make doc.content in
       let position = lsp_position_to_merlin pos in
       let prefix = Merlin_jsoo.Completion.prefix_of_position source position in
-      if prefix = "" then None
+      if prefix = "" then Lwt.return None
       else
-        try
-          let query =
-            Query_protocol.Complete_prefix (prefix, position, [], true, true)
-          in
-          (* TODO: documentation for completion items *)
-          let (completions : Query_protocol.completions) =
-            Merlin_jsoo.dispatch source query
-          in
-          let items =
-            List.map completions.entries
-              ~f:(fun (entry : Query_protocol.Compl.entry) ->
-                let kind = completion_kind entry in
-                CompletionItem.create ~label:entry.name ~kind
-                  ~detail:entry.desc ())
-          in
-          let list =
-            CompletionList.create ~isIncomplete:false ~items ()
-          in
-          Some (`CompletionList list)
-        with _ -> None
+        Lwt.return
+        ( try
+            let query =
+              Query_protocol.Complete_prefix (prefix, position, [], true, true)
+            in
+            let (completions : Query_protocol.completions) =
+              Merlin_jsoo.dispatch source query
+            in
+            let items =
+              List.map completions.entries
+                ~f:(fun (entry : Query_protocol.Compl.entry) ->
+                  let kind = completion_kind entry in
+                  (* TODO also return documentation *)
+                  CompletionItem.create ~label:entry.name ~kind
+                    ~detail:entry.desc ())
+            in
+            let list =
+              CompletionList.create ~isIncomplete:false ~items ()
+            in
+            Some (`CompletionList list)
+          with _ -> None )
 
     method! on_request_unhandled ~notify_back:_ ~id:_
-        (type a) (r : a Lsp.Client_request.t) : a =
+          (type a) (r : a Lsp.Client_request.t) : a Lwt.t =
       match r with
       | Lsp.Client_request.SignatureHelp params ->
         let uri = params.textDocument.uri in
         let empty = SignatureHelp.create ~signatures:[] () in
         (match self#find_doc uri with
-         | None -> empty
+         | None -> Lwt.return empty
          | Some doc ->
            let source = Msource.make doc.content in
            let position = lsp_position_to_merlin params.position in
@@ -227,27 +321,30 @@ class merlin_server =
              is_retrigger;
              active_signature_help = None;
            } in
-           (try
-             match Merlin_jsoo.dispatch source query with
-             | None -> empty
-             | Some result ->
-               let params = List.map result.parameters
-                 ~f:(fun (p : Query_protocol.signature_help_param) ->
-                   ParameterInformation.create
-                     ~label:(`Offset (p.label_start, p.label_end)) ()) in
-               let sig_info = SignatureInformation.create
-                 ~label:result.label
-                 ~parameters:params
-                 ~activeParameter:(Some result.active_param)
-                 () in
-               SignatureHelp.create
-                 ~signatures:[sig_info]
-                 ~activeSignature:result.active_signature
-                 ~activeParameter:(Some result.active_param)
-                 ()
-           with _ -> empty))
-      | _ -> Stdlib.failwith "unhandled request"
+           Lwt.return
+           ( try
+               match Merlin_jsoo.dispatch source query with
+               | None -> empty
+               | Some result ->
+                 let params = List.map result.parameters
+                   ~f:(fun (p : Query_protocol.signature_help_param) ->
+                     ParameterInformation.create
+                       ~label:(`Offset (p.label_start, p.label_end)) ()) in
+                 let sig_info = SignatureInformation.create
+                   ~label:result.label
+                   ~parameters:params
+                   ~activeParameter:(Some result.active_param)
+                   () in
+                 SignatureHelp.create
+                   ~signatures:[sig_info]
+                   ~activeSignature:result.active_signature
+                   ~activeParameter:(Some result.active_param)
+                   ()
+             with _ -> empty ))
+      | _ -> Lwt.fail_with "unhandled request"
   end
+
+(* === Custom notifications === *)
 
 let handle_add_cmis params =
   let open Yojson.Safe.Util in
@@ -267,94 +364,35 @@ let handle_add_cmis params =
        Merlin_jsoo.add_dynamic_cmis ~url ~toplevel_modules)
    with Type_error _ -> ())
 
-(* Worker-based JSON-RPC transport *)
-
-let post_json json =
-  let s = Yojson.Safe.to_string json in
-  Merlin_jsoo.log (Printf.sprintf "[lsp-server] >>> %s" s);
-  Worker.post_message (Js.string s)
-
-(* Send server notifications (diagnostics, log messages, etc.) to the client *)
-let notify_back (notif : Lsp.Server_notification.t) =
-  let notif = Lsp.Server_notification.to_jsonrpc notif in
-  post_json (Jsonrpc.Notification.yojson_of_t notif)
+(* === Entry point === *)
 
 let run () =
   Merlin_jsoo.init ();
 
   let server = new merlin_server in
+  let ic = IO_worker.create_in_channel () in
+  let t = Server.create ~ic ~oc:() server in
 
-  (* Send server-initiated requests to the client *)
-  let next_id = ref 0 in
-  let pending :
-      (Jsonrpc.Id.t, Jsonrpc.Response.t -> unit) Hashtbl.t =
-    Hashtbl.create 8
-  in
-  let server_request
-      (Server.Request_and_handler (req, handler)) =
-    let id = `Int !next_id in
-    incr next_id;
-    let jsonrpc_req = Lsp.Server_request.to_jsonrpc_request req ~id in
-    Hashtbl.replace pending id (fun (resp : Jsonrpc.Response.t) ->
-        match resp.result with
-        | Ok json ->
-            let result = Lsp.Server_request.response_of_json req json in
-            handler (Ok result)
-        | Error err -> handler (Error err));
-    post_json (Jsonrpc.Request.yojson_of_t jsonrpc_req);
-    id
-  in
-
-  (* Handle incoming JSON-RPC messages from the client *)
-  (* This is a bit low-level, we could maybe work with a Jsonrpc2 server and
-  some lwt synchronisation primitive in the IO implementation. *)
+  (* Incoming worker messages: intercept custom notifications,
+     forward everything else to the linol server via the IO channel *)
   Worker.set_onmessage (fun msg ->
       let json_str = Js.to_string msg in
       Merlin_jsoo.log (Printf.sprintf "[lsp-server] <<< %s" json_str);
-      let json = Yojson.Safe.from_string json_str in
-      let packet = Jsonrpc.Packet.t_of_yojson json in
-      match packet with
-      | Jsonrpc.Packet.Notification notif ->
-          if notif.method_ = "merlin/addCmis" then (
-            match notif.params with
-            | Some (`Assoc _ as params) -> handle_add_cmis params
-            | _ -> ())
-          else (
-          match Lsp.Client_notification.of_jsonrpc notif with
-          | Ok n ->
-              server#on_notification ~notify_back ~server_request n
-          | Error _ -> ())
-      | Jsonrpc.Packet.Request req -> (
-          match Lsp.Client_request.of_jsonrpc req with
-          | Ok (Lsp.Client_request.E r) ->
-              let result =
-                server#on_request ~notify_back ~server_request
-                  ~id:req.id r
-              in
-              let response =
-                match result with
-                | Ok value ->
-                    Jsonrpc.Response.ok req.id
-                      (Lsp.Client_request.yojson_of_result r value)
-                | Error msg ->
-                    Jsonrpc.Response.error req.id
-                      (Jsonrpc.Response.Error.make
-                         ~code:InternalError ~message:msg ())
-              in
-              post_json (Jsonrpc.Response.yojson_of_t response)
-          | Error msg ->
-              let response =
-                Jsonrpc.Response.error req.id
-                  (Jsonrpc.Response.Error.make ~code:InvalidRequest
-                     ~message:msg ())
-              in
-              post_json (Jsonrpc.Response.yojson_of_t response))
-      | Jsonrpc.Packet.Response resp -> (
-          match Hashtbl.find_opt pending resp.id with
-          | Some handler ->
-              Hashtbl.remove pending resp.id;
-              handler resp
-          | None -> ())
-      | _ -> ())
+      let is_add_cmis =
+        try
+          let json = Yojson.Safe.from_string json_str in
+          match Linol_jsonrpc.Jsonrpc.Packet.t_of_yojson json with
+          | Linol_jsonrpc.Jsonrpc.Packet.Notification notif
+            when notif.method_ = "merlin/addCmis" ->
+            (match notif.params with
+             | Some (`Assoc _ as params) -> handle_add_cmis params
+             | _ -> ());
+            true
+          | _ -> false
+        with _ -> false
+      in
+      if not is_add_cmis then
+        IO_worker.push_message ic json_str);
+  Server.run t
 
-let ()=  run ()
+let () = Lwt.async run
