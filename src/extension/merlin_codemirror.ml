@@ -53,9 +53,35 @@ module Extensions (Worker : Merlin_client.WORKER) = struct
     in
     let options =
       let num_completions = List.length entries in
-      List.mapi (fun i Query_protocol.Compl.{ name; desc; _ } ->
+      let  arrowed s =
+      let l = String.length s in
+        let rec aux started i =
+          if i >= l then false else
+          let next = String.get s i in
+          match started, next with
+          | true, '>' -> true
+          | true, _ -> aux false (i + 1)
+          | false, '-' -> aux true (i + 1)
+          | false, _ -> aux false (i + 1)
+        in
+        aux false 0
+      in
+      List.mapi (fun i Query_protocol.Compl.{ name; desc; kind; _ } ->
         let boost = num_completions - i in
-        Autocomplete.Completion.create ~label:name ~detail:desc ~boost ()) entries
+        let type_ = match kind with
+          | `Keyword -> "keyword"
+          | `Module -> "class"
+          | `Modtype -> "interface"
+          | `Type -> "type"
+          | `Label -> "property"
+          | `Value when arrowed desc -> "function"
+          | `Value -> "varible"
+          | `Variant
+          | `Constructor-> "type"
+          | `MethodCall -> "method"
+        in
+        (* class, constant, enum, function, interface, keyword, method, namespace, property, text, type, and variable*)
+        Autocomplete.Completion.create ~label:name ~detail:desc ~boost ~type_ ()) entries
     in
     Some (Autocomplete.Result.create ~filter:true ~from ~to_ ~options ())
 

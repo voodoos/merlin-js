@@ -20,7 +20,7 @@ jobs:
         os:
           - ubuntu-latest
         ocaml-compiler:
-          - 5.2.x
+          - 5.4.x
     # The type of runner that the job will run on
     runs-on: ${{ matrix.os }}
 
@@ -28,6 +28,13 @@ jobs:
     steps:
       # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
       - uses: actions/checkout@v4
+
+      - name: Set up Homebrew
+        id: set-up-homebrew
+        uses: Homebrew/actions/setup-homebrew@main
+
+      - name: Install wasm toolchain
+        run: brew install binaryen
 
       - name: Set up OCaml ${{ matrix.ocaml-compiler }}
         uses: ocaml/setup-ocaml@v3
