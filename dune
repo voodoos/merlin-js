@@ -14,13 +14,8 @@
  (modes js)
  (promote (until-clean))
  (modules Dynamic)
- (libraries
-  merlin_client
-  code-mirror
-  merlin-js.code-mirror))
+ (libraries merlin_client code-mirror merlin-js.code-mirror))
 
 (alias
  (name all-js)
- (deps
-   app.bc.js
-   dynamic.bc.js))
+ (deps app.bc.js dynamic.bc.js))

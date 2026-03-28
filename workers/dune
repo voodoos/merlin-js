@@ -3,7 +3,8 @@
  (modules merlin_worker)
  (promote (until-clean))
  (modes js wasm)
- (preprocess (pps js_of_ocaml-ppx))
+ (preprocess
+  (pps js_of_ocaml-ppx))
  (libraries worker js_of_ocaml))
 
 (executable
@@ -11,14 +12,14 @@
  (modules merlin_lsp_worker)
  (promote (until-clean))
  (modes js wasm)
- (preprocess (pps js_of_ocaml-ppx))
+ (preprocess
+  (pps js_of_ocaml-ppx))
  (libraries merlin_lsp js_of_ocaml))
-
 
 (alias
  (name all-js)
  (deps
-   merlin_worker.bc.js
-   merlin_worker.bc.wasm.js
-   merlin_lsp_worker.bc.js
-   merlin_lsp_worker.bc.wasm.js))
+  merlin_worker.bc.js
+  merlin_worker.bc.wasm.js
+  merlin_lsp_worker.bc.js
+  merlin_lsp_worker.bc.wasm.js))
