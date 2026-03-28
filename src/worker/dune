@@ -1,7 +1,8 @@
 (library
  (name worker)
  (public_name merlin-js.worker)
- (preprocess (pps js_of_ocaml-ppx))
+ (preprocess
+  (pps js_of_ocaml-ppx))
  (libraries
   protocol
   merlin-js.merlin-jsoo

@@ -12,13 +12,11 @@ module type Config = sig
 
   val cmis : Protocol.cmis
   (** CMIs are required for merlin to work correctly. These can either be
-      provided statically or provided as a list of URLs from which the
-      CMIs can be downloaded. If using URLs, these will only be
-      downloaded on demand. *)
+      provided statically or provided as a list of URLs from which the CMIs can
+      be downloaded. If using URLs, these will only be downloaded on demand. *)
 end
 
 module Make : functor (_ : Config) -> sig
-
   val autocomplete : Code_mirror.Extension.t
   (** An extension providing completions when typing *)
 
@@ -30,11 +28,9 @@ module Make : functor (_ : Config) -> sig
 
   val all_extensions : Code_mirror.Extension.t array
   (** All the Merlin-specific extensions (does not include [ocaml]) *)
-
 end
 
 module Extensions (Worker : Merlin_client.WORKER) : sig
-
   type worker = Merlin_client.Make(Worker).worker
 
   val autocomplete : worker Fut.t -> Code_mirror.Extension.t
@@ -48,5 +44,4 @@ module Extensions (Worker : Merlin_client.WORKER) : sig
 
   val all_extensions : worker Fut.t -> Code_mirror.Extension.t array
   (** All the Merlin-specific extensions (does not include [ocaml]) *)
-
 end

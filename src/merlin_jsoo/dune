@@ -1,7 +1,8 @@
 (library
  (name merlin_jsoo)
  (public_name merlin-js.merlin-jsoo)
- (preprocess (pps js_of_ocaml-ppx))
+ (preprocess
+  (pps js_of_ocaml-ppx))
  (libraries
   merlin-lib.kernel
   merlin-lib.utils

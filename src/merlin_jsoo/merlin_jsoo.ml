@@ -10,6 +10,7 @@ let log s = ignore (Console.console##log (Js.string s))
 (* === CMI loading === *)
 
 type cmaybe = Cmi of Cmi_format.cmi_infos | Url of string
+
 let cmi_store : (string, cmaybe) Hashtbl.t = Hashtbl.create 128
 
 let sync_get url =
@@ -21,7 +22,9 @@ let sync_get url =
   | 200 ->
       Js.Opt.case
         (File.CoerceTo.arrayBuffer x##.response)
-        (fun () -> log "Failed to receive file"; None)
+        (fun () ->
+          log "Failed to receive file";
+          None)
         (fun b -> Some (Typed_array.String.of_arrayBuffer b))
   | _ -> None
 
@@ -33,53 +36,58 @@ type header = Misc.modname * Ocaml_typing.Types.signature_item list
 let read_cmi_from_string s =
   let open Cmi_format in
   match String.chop_prefix ~prefix:Config.cmi_magic_number s with
-  | None -> log "Wrong magic number"; None
+  | None ->
+      log "Wrong magic number";
+      None
   | Some rest ->
-    let rest = String.to_bytes rest in
-    let (cmi_name, cmi_sign) : header = Marshal.from_bytes rest 0 in
-    let offset = Marshal.header_size + Marshal.data_size rest 0 in
-    let cmi_crcs : Misc.crcs = Marshal.from_bytes rest offset in
-    let offset = offset + Marshal.header_size + Marshal.data_size rest offset in
-    let cmi_flags : Cmi_format.pers_flags list = Marshal.from_bytes rest offset in
-    Some { cmi_name; cmi_sign; cmi_crcs; cmi_flags }
+      let rest = String.to_bytes rest in
+      let (cmi_name, cmi_sign) : header = Marshal.from_bytes rest 0 in
+      let offset = Marshal.header_size + Marshal.data_size rest 0 in
+      let cmi_crcs : Misc.crcs = Marshal.from_bytes rest offset in
+      let offset =
+        offset + Marshal.header_size + Marshal.data_size rest offset
+      in
+      let cmi_flags : Cmi_format.pers_flags list =
+        Marshal.from_bytes rest offset
+      in
+      Some { cmi_name; cmi_sign; cmi_crcs; cmi_flags }
 
-let cmi_load_urls : string list ref = ref ["stdlib/"]
+let cmi_load_urls : string list ref = ref [ "stdlib/" ]
 
 let persistent_sig_loader ~allow_hidden:_ ~unit_name =
   let open Persistent_env.Persistent_signature in
   log @@ Printf.sprintf "Loading signature for %S" unit_name;
   match Hashtbl.find_opt cmi_store unit_name with
   | Some (Cmi infos) ->
-    Some { filename = unit_name; cmi = infos; visibility = Visible }
+      Some { filename = unit_name; cmi = infos; visibility = Visible }
   | Some (Url url) ->
-    Option.bind (sync_get url) ~f:read_cmi_from_string
-    |> Option.map ~f:(fun cmi ->
-      Hashtbl.replace cmi_store unit_name (Cmi cmi);
-      { filename = unit_name; cmi; visibility = Visible })
-  | None ->
-    List.find_mapi !cmi_load_urls ~f:(fun _ url ->
-      let filename = filename_of_module unit_name in
-      let url = Filename.concat url filename in
       Option.bind (sync_get url) ~f:read_cmi_from_string
       |> Option.map ~f:(fun cmi ->
-        Hashtbl.replace cmi_store unit_name (Cmi cmi);
-        { filename = unit_name; cmi; visibility = Visible }))
+          Hashtbl.replace cmi_store unit_name (Cmi cmi);
+          { filename = unit_name; cmi; visibility = Visible })
+  | None ->
+      List.find_mapi !cmi_load_urls ~f:(fun _ url ->
+          let filename = filename_of_module unit_name in
+          let url = Filename.concat url filename in
+          Option.bind (sync_get url) ~f:read_cmi_from_string
+          |> Option.map ~f:(fun cmi ->
+              Hashtbl.replace cmi_store unit_name (Cmi cmi);
+              { filename = unit_name; cmi; visibility = Visible }))
 
 let add_static_cmis cmis =
   List.iter cmis ~f:(fun (name, content) ->
-    let cmi_infos = read_cmi_from_string content in
-    Option.iter cmi_infos ~f:(fun cmi_infos ->
-      Hashtbl.replace cmi_store name (Cmi cmi_infos)))
+      let cmi_infos = read_cmi_from_string content in
+      Option.iter cmi_infos ~f:(fun cmi_infos ->
+          Hashtbl.replace cmi_store name (Cmi cmi_infos)))
 
 let add_dynamic_cmis ~url ~toplevel_modules =
   List.iter toplevel_modules ~f:(fun name ->
-    let filename = filename_of_module name in
-    let full_url = Filename.concat url filename in
-    log @@ Printf.sprintf "Known cmi for %s: %s" name full_url;
-    Hashtbl.replace cmi_store name (Url full_url))
+      let filename = filename_of_module name in
+      let full_url = Filename.concat url filename in
+      log @@ Printf.sprintf "Known cmi for %s: %s" name full_url;
+      Hashtbl.replace cmi_store name (Url full_url))
 
-let init () =
-  Persistent_env.Persistent_signature.load := persistent_sig_loader
+let init () = Persistent_env.Persistent_signature.load := persistent_sig_loader
 
 (* === Merlin pipeline === *)
 
@@ -109,8 +117,7 @@ module Completion = struct
         match from with
         | None -> len - 1
         | Some i ->
-            if i > len - 1 then
-              raise @@ Invalid_argument "rfindi: invalid from"
+            if i > len - 1 then raise @@ Invalid_argument "rfindi: invalid from"
             else i
       in
       loop s ~f from
@@ -141,8 +148,8 @@ module Completion = struct
               | 'a' .. 'z'
               | 'A' .. 'Z'
               | '0' .. '9'
-              | '\'' | '_' | '$' | '&' | '*' | '+' | '-' | '/' | '=' | '>'
-              | '@' | '^' | '!' | '?' | '%' | '<' | ':' | '~' | '#' ->
+              | '\'' | '_' | '$' | '&' | '*' | '+' | '-' | '/' | '=' | '>' | '@'
+              | '^' | '!' | '?' | '%' | '<' | ':' | '~' | '#' ->
                   true
               | '`' ->
                   if !has_seen_dot then false

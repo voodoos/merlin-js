@@ -10,19 +10,19 @@ type source = string
     example, for the OCaml standard library, a user might pass:
 
     {[
-      { dcs_url="/static/stdlib";
-        dcs_toplevel_modules=["Stdlib"];
-        dcs_file_prefixes=["stdlib__"]; }
+    {
+      dcs_url = "/static/stdlib";
+      dcs_toplevel_modules = [ "Stdlib" ];
+      dcs_file_prefixes = [ "stdlib__" ];
+    }
     ]}
 
-    In which case, merlin will expect to be able to download a valid file
-    from the url ["/static/stdlib/stdlib.cmi"] corresponding to the
-    specified toplevel module, and it will also attempt to download any
-    module with the prefix ["Stdlib__"] from the same base url, so for
-    example if an attempt is made to look up the module ["Stdlib__Foo"]
-    then merlin-js will attempt to download a file from the url
-    ["/static/stdlib/stdlib__Foo.cmi"].
-    *)
+    In which case, merlin will expect to be able to download a valid file from
+    the url ["/static/stdlib/stdlib.cmi"] corresponding to the specified
+    toplevel module, and it will also attempt to download any module with the
+    prefix ["Stdlib__"] from the same base url, so for example if an attempt is
+    made to look up the module ["Stdlib__Foo"] then merlin-js will attempt to
+    download a file from the url ["/static/stdlib/stdlib__Foo.cmi"]. *)
 
 type dynamic_cmis = {
   dcs_url : string;
@@ -47,49 +47,49 @@ type action =
   | Add_cmis of cmis
 
 let action_to_string = function
-| Complete_prefix _ -> "Complete_prefix"
-| Type_enclosing _ -> "Type_enclosing"
-| All_errors _ -> "All_errors"
-| Add_cmis _ -> "Add_cmis"
+  | Complete_prefix _ -> "Complete_prefix"
+  | Type_enclosing _ -> "Type_enclosing"
+  | All_errors _ -> "All_errors"
+  | Add_cmis _ -> "Add_cmis"
 
 type error = {
   kind : Location.report_kind;
-  loc: Location.t;
+  loc : Location.t;
   main : string;
   sub : string list;
   source : Location.error_source;
 }
 
 type completions = {
-  from: int;
-  to_: int;
-  entries : Query_protocol.Compl.entry list
+  from : int;
+  to_ : int;
+  entries : Query_protocol.Compl.entry list;
 }
 
-type is_tail_position =
-  [`No | `Tail_position | `Tail_call]
+type is_tail_position = [ `No | `Tail_position | `Tail_call ]
 
 (* type errors = { from: int; to_: int; entries: error list } *)
 type answer =
- | Ready
- | Errors of error list
- | Completions of completions
- | Typed_enclosings of
-    (Location.t * [ `Index of int | `String of string ] * is_tail_position) list
- | Added_cmis
+  | Ready
+  | Errors of error list
+  | Completions of completions
+  | Typed_enclosings of
+      (Location.t * [ `Index of int | `String of string ] * is_tail_position)
+      list
+  | Added_cmis
 
 let answer_to_string = function
- | Ready -> "Ready"
- | Errors _ -> "Errors"
- | Completions _ -> "Completions"
- | Typed_enclosings _ -> "Type_enclosings"
- | Added_cmis -> "Added_cmis"
+  | Ready -> "Ready"
+  | Errors _ -> "Errors"
+  | Completions _ -> "Completions"
+  | Typed_enclosings _ -> "Type_enclosings"
+  | Added_cmis -> "Added_cmis"
 
 let report_source_to_string = function
-  | Location.Lexer   -> "lexer"
-  | Location.Parser  -> "parser"
-  | Location.Typer   -> "typer"
+  | Location.Lexer -> "lexer"
+  | Location.Parser -> "parser"
+  | Location.Typer -> "typer"
   | Location.Warning -> "warning" (* todo incorrect ?*)
   | Location.Unknown -> "unknown"
-  | Location.Env     -> "env"
-  | Location.Config  -> "config"
+  | Location.Env -> "env"
+  | Location.Config -> "config"

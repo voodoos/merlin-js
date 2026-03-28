@@ -7,9 +7,11 @@ let return = Lwt.return
 let failwith = Lwt.fail_with
 let ( let+ ) = Lwt.( >|= )
 let ( let* ) = Lwt.( >>= )
+
 let ( and+ ) a b =
   let open Lwt in
-  a >>= fun x -> b >|= fun y -> (x, y)
+  a >>= fun x ->
+  b >|= fun y -> (x, y)
 
 let fail e _bt = Lwt.fail e
 
@@ -24,8 +26,7 @@ type msg_queue = {
 }
 
 let pop_msg q =
-  if not (Queue.is_empty q.queue) then
-    Lwt.return (Queue.pop q.queue)
+  if not (Queue.is_empty q.queue) then Lwt.return (Queue.pop q.queue)
   else
     let p, w = Lwt.wait () in
     q.waiter <- Some w;
@@ -33,20 +34,17 @@ let pop_msg q =
 
 (* Input channel: reads from a buffer, refilled from worker messages
     with LSP Content-Length framing added *)
-type in_channel = {
-  q : msg_queue;
-  mutable buf : string;
-  mutable pos : int;
-}
+type in_channel = { q : msg_queue; mutable buf : string; mutable pos : int }
 
 let create_in_channel () =
-  { q = { queue = Queue.create (); waiter = None };
-    buf = ""; pos = 0 }
+  { q = { queue = Queue.create (); waiter = None }; buf = ""; pos = 0 }
 
 let push_message ic msg =
   let q = ic.q in
   match q.waiter with
-  | Some w -> q.waiter <- None; Lwt.wakeup w msg
+  | Some w ->
+      q.waiter <- None;
+      Lwt.wakeup w msg
   | None -> Queue.push msg q.queue
 
 (* Ensure the buffer has data, fetching and framing the next message if needed *)
@@ -55,8 +53,7 @@ let ensure_data ic =
   else
     let+ msg = pop_msg ic.q in
     let framed =
-      Printf.sprintf "Content-Length: %d\r\n\r\n%s"
-        (String.length msg) msg
+      Printf.sprintf "Content-Length: %d\r\n\r\n%s" (String.length msg) msg
     in
     ic.buf <- framed;
     ic.pos <- 0
@@ -65,16 +62,15 @@ let read_line ic =
   let* () = ensure_data ic in
   match String.index_from_opt ic.buf ic.pos '\n' with
   | Some i ->
-    let line = String.sub ic.buf ~pos:ic.pos ~len:(i - ic.pos) in
-    ic.pos <- i + 1;
-    Lwt.return line
+      let line = String.sub ic.buf ~pos:ic.pos ~len:(i - ic.pos) in
+      ic.pos <- i + 1;
+      Lwt.return line
   | None ->
-    let line =
-      String.sub ic.buf ~pos:ic.pos
-        ~len:(Stdlib.String.length ic.buf - ic.pos)
-    in
-    ic.pos <- String.length ic.buf;
-    Lwt.return line
+      let line =
+        String.sub ic.buf ~pos:ic.pos ~len:(Stdlib.String.length ic.buf - ic.pos)
+      in
+      ic.pos <- String.length ic.buf;
+      Lwt.return line
 
 let read ic buf off len =
   let rec loop off remaining =
@@ -103,15 +99,18 @@ let write_string () s =
   let rec find i =
     if i + sep_len > s_len then ()
     else if String.sub s ~pos:i ~len:sep_len = sep then begin
-      let json_str = String.sub s ~pos:(i + sep_len) ~len:(s_len - i - sep_len) in
+      let json_str =
+        String.sub s ~pos:(i + sep_len) ~len:(s_len - i - sep_len)
+      in
       Merlin_jsoo.log (Printf.sprintf "[lsp-server] >>> %s" json_str);
       Js_of_ocaml.Worker.post_message (Js_of_ocaml.Js.string json_str)
-    end else
-      find (i + 1)
+    end
+    else find (i + 1)
   in
   find 0;
   Lwt.return_unit
 
 type env = unit
+
 let stdin () = Stdlib.failwith "IO_worker: use create_in_channel"
 let stdout () = Stdlib.failwith "IO_worker: stdout not implemented"
