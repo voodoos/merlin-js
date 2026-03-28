@@ -1,6 +1,9 @@
 (rule
  (alias all-js)
- (deps main.js package.json)
+ (deps main.js package.json yarn.lock .yarnrc.yml .pnp.cjs .pnp.loader.mjs
+  (glob_files .yarn/cache/*.zip))
  (targets merlin-lsp.js)
  (mode (promote (until-clean)))
  (action (progn (run yarn install) (run yarn build))))
+ ; We have to run yarn install because if not we would need to also track the
+ ; unplugged cache.

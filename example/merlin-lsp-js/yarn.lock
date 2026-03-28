@@ -472,9 +472,6 @@ __metadata:
     "@codemirror/view": "npm:^6.40.0"
     codemirror: "npm:^6.0.2"
     esbuild: "npm:^0.27.4"
-  dependenciesMeta:
-    "@codemirror/lsp-client@6.2.2":
-      unplugged: true
   languageName: unknown
   linkType: soft
 

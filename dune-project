@@ -14,6 +14,8 @@
    js_of_ocaml
    js_of_ocaml-ppx
    wasm_of_ocaml-compiler
+   linol
+   lwt
    brr
    code-mirror
    yojson
