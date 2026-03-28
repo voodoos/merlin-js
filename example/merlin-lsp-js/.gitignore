@@ -16,4 +16,3 @@ node_modules
 !.yarn/cache
 #.pnp.*
 
-merlin-lsp.js
