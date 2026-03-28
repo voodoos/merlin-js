@@ -1,9 +1,11 @@
+
 (library
- (name worker)
- (public_name merlin-js.worker)
+ (name merlin_lsp)
  (preprocess (pps js_of_ocaml-ppx))
+ (js_of_ocaml (javascript_files thread_stubs.js))
  (libraries
-  protocol
+  linol
+  lwt
   merlin-js.merlin-jsoo
   merlin-lib.kernel
   merlin-lib.utils

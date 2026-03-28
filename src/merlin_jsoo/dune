@@ -1,10 +1,8 @@
 (library
- (name worker)
- (public_name merlin-js.worker)
+ (name merlin_jsoo)
+ (public_name merlin-js.merlin-jsoo)
  (preprocess (pps js_of_ocaml-ppx))
  (libraries
-  protocol
-  merlin-js.merlin-jsoo
   merlin-lib.kernel
   merlin-lib.utils
   merlin-lib.query_protocol
