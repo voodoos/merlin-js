@@ -16,4 +16,5 @@
    wasm_of_ocaml-compiler
    brr
    code-mirror
-   yojson))
+   yojson
+   ppx_blob))

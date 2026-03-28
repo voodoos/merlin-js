@@ -12,6 +12,7 @@ depends: [
   "brr"
   "code-mirror"
   "yojson"
+  "ppx_blob"
   "odoc" {with-doc}
 ]
 build: [
