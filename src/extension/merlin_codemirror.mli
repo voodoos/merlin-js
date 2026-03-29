@@ -1,6 +1,6 @@
 module Utils : sig
   val get_el_by_id : string -> Brr.El.t
-  val get_full_doc : Code_mirror.Editor.State.t -> string
+  val get_full_doc : Code_mirror.State.EditorState.t -> string
 end
 
 val ocaml : Code_mirror.Extension.t
@@ -26,7 +26,7 @@ module Make : functor (_ : Config) -> sig
   val linter : Code_mirror.Extension.t
   (** An extension that highlights errors and warnings in the code *)
 
-  val all_extensions : Code_mirror.Extension.t array
+  val all_extensions : Code_mirror.Extension.t list
   (** All the Merlin-specific extensions (does not include [ocaml]) *)
 end
 
@@ -42,6 +42,6 @@ module Extensions (Worker : Merlin_client.WORKER) : sig
   val linter : worker Fut.t -> Code_mirror.Extension.t
   (** An extension that highlights errors and warnings in the code *)
 
-  val all_extensions : worker Fut.t -> Code_mirror.Extension.t array
+  val all_extensions : worker Fut.t -> Code_mirror.Extension.t list
   (** All the Merlin-specific extensions (does not include [ocaml]) *)
 end
