@@ -22,7 +22,7 @@ let worker_transport (worker : Worker.t) : Transport.t =
 
 let _ =
   let open Fut.Result_syntax in
-  let worker = Worker.create (Jstr.v "workers/merlin_lsp_worker.bc.js") in
+  let worker = Worker.create (Jstr.v "workers/merlin_lsp_worker.bc.wasm.js") in
   let transport = worker_transport worker in
   let extensions = language_server_extensions () in
   let client =

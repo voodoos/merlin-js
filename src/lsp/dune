@@ -4,6 +4,8 @@
   (pps js_of_ocaml-ppx))
  (js_of_ocaml
   (javascript_files thread_stubs.js))
+ (wasm_of_ocaml
+  (javascript_files thread_stubs.js thread_stubs.wat))
  (libraries
   linol
   lwt
