@@ -119,12 +119,27 @@ class merlin_server =
       let source = Msource.make doc.content in
       let position = lsp_position_to_merlin pos in
       let query = Query_protocol.Type_enclosing (None, position, None) in
+      let get_doc () =
+        let query = Query_protocol.Document (None, position) in
+        try
+          (* TODO: move all these try catch away and use Result.t *)
+          match Merlin_jsoo.dispatch source query with
+          | `Found doc -> Some doc
+          | _ -> None
+        with _ -> None
+      in
       Lwt.return
         (try
            match Merlin_jsoo.dispatch source query with
            | [] -> None
            | (loc, `String typ, _) :: _ ->
-               let value = Printf.sprintf "```ocaml\n%s\n```" typ in
+               let doc = get_doc () in
+               let value =
+                 match doc with
+                 | None -> Printf.sprintf "```ocaml\n%s\n```" typ
+                 | Some doc ->
+                     Printf.sprintf "%s\n***\n```ocaml\n%s\n```" doc typ
+               in
                let contents =
                  MarkupContent.create ~kind:MarkupKind.Markdown ~value
                in
