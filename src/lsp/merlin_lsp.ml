@@ -99,7 +99,7 @@ class merlin_server =
       in
       ServerCapabilities.create ?codeLensProvider:c.codeLensProvider
         ?completionProvider:c.completionProvider ?hoverProvider:c.hoverProvider
-        ~definitionProvider:(`Bool true)
+        ~documentHighlightProvider:(`Bool true) ~definitionProvider:(`Bool true)
         ~textDocumentSync:
           (Option.value c.textDocumentSync
              ~default:(`TextDocumentSyncKind TextDocumentSyncKind.Full))
@@ -136,7 +136,7 @@ class merlin_server =
            match Merlin_jsoo.dispatch source query with
            | [] -> None
            | (loc, `String typ, _) :: _ ->
-               let doc = get_doc () in
+               let doc = get_doc source position in
                let value =
                  match doc with
                  | None -> Printf.sprintf "```ocaml\n%s\n```" typ
@@ -204,6 +204,29 @@ class merlin_server =
     method! on_request_unhandled ~notify_back:_ ~id:_ (type a)
         (r : a Lsp.Client_request.t) : a Lwt.t =
       match r with
+      | Lsp.Client_request.TextDocumentHighlight params -> (
+          let uri = params.textDocument.uri in
+          match self#find_doc uri with
+          | None -> Lwt.return None
+          | Some doc ->
+              let source = Msource.make doc.content in
+              let position = lsp_position_to_merlin params.position in
+              let query =
+                Query_protocol.Occurrences (`Ident_at position, `Buffer)
+              in
+              Lwt.return
+                (try
+                   let occurrences, _status =
+                     Merlin_jsoo.dispatch source query
+                   in
+                   let highlights =
+                     List.map occurrences
+                       ~f:(fun (occ : Query_protocol.occurrence) ->
+                         DocumentHighlight.create ~range:(loc_to_range occ.loc)
+                           ~kind:DocumentHighlightKind.Read ())
+                   in
+                   Some highlights
+                 with _ -> None))
       | Lsp.Client_request.SignatureHelp params -> (
           let uri = params.textDocument.uri in
           let empty = SignatureHelp.create ~signatures:[] () in
