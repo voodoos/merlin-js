@@ -65,15 +65,15 @@ module Transport = struct
 
   let create ~send ~subscribe ~unsubscribe =
     let o = Jv.obj [||] in
-    Jv.set o "send" (Jv.callback ~arity:1 (fun msg -> send (Jv.to_string msg)));
+    Jv.set o "send" (Jv.callback ~arity:1 (fun msg -> send (Jv.to_jstr msg)));
     Jv.set o "subscribe"
       (Jv.callback ~arity:1 (fun handler ->
            subscribe (fun msg ->
-               Jv.apply handler [| Jv.of_string msg |] |> ignore)));
+               Jv.apply handler [| Jv.of_jstr msg |] |> ignore)));
     Jv.set o "unsubscribe"
       (Jv.callback ~arity:1 (fun handler ->
            unsubscribe (fun msg ->
-               Jv.apply handler [| Jv.of_string msg |] |> ignore)));
+               Jv.apply handler [| Jv.of_jstr msg |] |> ignore)));
     o
 end
 

@@ -24,9 +24,9 @@ module Transport : sig
   include Jv.CONV with type t := t
 
   val create :
-    send:(string -> unit) ->
-    subscribe:((string -> unit) -> unit) ->
-    unsubscribe:((string -> unit) -> unit) ->
+    send:(Jstr.t -> unit) ->
+    subscribe:((Jstr.t -> unit) -> unit) ->
+    unsubscribe:((Jstr.t -> unit) -> unit) ->
     t
 end
 
