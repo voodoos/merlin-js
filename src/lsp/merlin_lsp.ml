@@ -62,6 +62,15 @@ let diagnostic_of_report =
 
 module Server = Linol.Make (Worker_io)
 
+let get_doc source position =
+  let query = Query_protocol.Document (None, position) in
+  try
+    (* TODO: move all these try catch away and use Result.t *)
+    match Merlin_jsoo.dispatch source query with
+    | `Found doc -> Some doc
+    | _ -> None
+  with _ -> None
+
 class merlin_server =
   object (self)
     inherit Server.server
@@ -122,15 +131,6 @@ class merlin_server =
       let source = Msource.make doc.content in
       let position = lsp_position_to_merlin pos in
       let query = Query_protocol.Type_enclosing (None, position, None) in
-      let get_doc () =
-        let query = Query_protocol.Document (None, position) in
-        try
-          (* TODO: move all these try catch away and use Result.t *)
-          match Merlin_jsoo.dispatch source query with
-          | `Found doc -> Some doc
-          | _ -> None
-        with _ -> None
-      in
       Lwt.return
         (try
            match Merlin_jsoo.dispatch source query with
