@@ -48,4 +48,7 @@ module LSPClient : sig
   val connected : t -> bool
 end
 
-val language_server_extensions : unit -> Extension.t list
+module Extensions : sig
+  val language_server_extensions : unit -> Extension.t list
+  val jump_to_definition_keymap : Keymap.t
+end

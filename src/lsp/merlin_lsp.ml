@@ -78,6 +78,8 @@ class merlin_server =
     method! config_completion =
       Some (CompletionOptions.create ~triggerCharacters:[ "." ] ())
 
+    method! config_definition = Some (`Bool true)
+
     method! config_modify_capabilities c =
       let signatureHelpProvider =
         SignatureHelpOptions.create
@@ -88,6 +90,7 @@ class merlin_server =
       in
       ServerCapabilities.create ?codeLensProvider:c.codeLensProvider
         ?completionProvider:c.completionProvider ?hoverProvider:c.hoverProvider
+        ~definitionProvider:(`Bool true)
         ~textDocumentSync:
           (Option.value c.textDocumentSync
              ~default:(`TextDocumentSyncKind TextDocumentSyncKind.Full))
@@ -149,6 +152,25 @@ class merlin_server =
                  Hover.create ~contents:(`MarkupContent contents) ~range ()
                in
                Some hover
+           | _ -> None
+         with _ -> None)
+
+    method! on_req_definition ~notify_back:_ ~id:_ ~uri ~pos ~workDoneToken:_
+        ~partialResultToken:_ (doc : Server.doc_state) =
+      let source = Msource.make doc.content in
+      let position = lsp_position_to_merlin pos in
+      let query = Query_protocol.Locate (None, `ML, position) in
+      Lwt.return
+        (try
+           match Merlin_jsoo.dispatch source query with
+           | `Found (_, pos) ->
+               let position =
+                 Position.create
+                   ~line:(max 0 (pos.Lexing.pos_lnum - 1))
+                   ~character:(max 0 (pos.pos_cnum - pos.pos_bol))
+               in
+               let range = Range.create ~start:position ~end_:position in
+               Some (`Location [ Location.create ~uri ~range ])
            | _ -> None
          with _ -> None)
 

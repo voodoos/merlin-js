@@ -110,6 +110,11 @@ module LSPClient = struct
   let connected t = Jv.Bool.get t "connected"
 end
 
-let language_server_extensions () =
-  Jv.apply (Lazy.force language_server_extensions_fn) [||]
-  |> Jv.to_list Extension.of_jv
+module Extensions = struct
+  let language_server_extensions () =
+    Jv.apply (Lazy.force language_server_extensions_fn) [||]
+    |> Jv.to_list Extension.of_jv
+
+  let jump_to_definition_keymap : Keymap.t =
+    Jv.get Jv.global "__CM__jumpToDefinitionKeymap"
+end

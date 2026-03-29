@@ -24,7 +24,10 @@ let _ =
   let open Fut.Result_syntax in
   let worker = Worker.create (Jstr.v "workers/merlin_lsp_worker.bc.js") in
   let transport = worker_transport worker in
-  let extensions = language_server_extensions () in
+  let keymap =
+    State.Facet.of_ Keymap.keymap Extensions.jump_to_definition_keymap
+  in
+  let extensions = Extensions.language_server_extensions () in
   let client =
     let config =
       LSPClientConfig.create ~root_uri:"file:///workspace" ~extensions ()
@@ -52,6 +55,7 @@ let _ =
     let extensions =
       [
         basic_setup;
+        keymap;
         Merlin_codemirror.ocaml;
         LSPClient.plugin client ~file_uri ~language_id:"ocaml" ();
       ]

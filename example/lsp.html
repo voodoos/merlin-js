@@ -12,14 +12,14 @@
 
     body {
       background-color: #4c4956;
-      font-family: 'Fira Code', monospace
+      font-family: 'Fira Code', monospace;
+      color: white;
     }
 
-    p {
+    .content {
       width: 50%;
       margin: auto;
       margin-top: 2rem;
-      color: white;
     }
 
     a {
@@ -28,7 +28,7 @@
 
     #editor {
       min-width: 30rem;
-      width: 50%;
+      width: 100%;
       height: 500px;
       border: 1px solid #ddd;
       border-radius: 0.5rem;
@@ -48,6 +48,7 @@
 
     .cm-editor {
       height: 100%;
+      color:black;
     }
 
     .cm-tooltip,
@@ -82,9 +83,11 @@
 </head>
 
 <body>
+    <div class="content">
   <noscript>Sorry, you need to enable JavaScript to see this page.</noscript>
-  <p>This example demonstrates using merlin in codemirror via the LSP protocol.
-  <div id="editor"></div>
+  <p>This example demonstrates using merlin in codemirror via the LSP protocol.</p>
+  <p><ul><li><kbd>F12</kbd> Jump to definition</ul></p>
+  <div id="editor"></div></div>
 </body>
 
 </html>
