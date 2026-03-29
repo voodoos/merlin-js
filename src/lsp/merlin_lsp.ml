@@ -99,7 +99,8 @@ class merlin_server =
       in
       ServerCapabilities.create ?codeLensProvider:c.codeLensProvider
         ?completionProvider:c.completionProvider ?hoverProvider:c.hoverProvider
-        ~documentHighlightProvider:(`Bool true) ~definitionProvider:(`Bool true)
+        ~documentHighlightProvider:(`Bool true)
+        ?definitionProvider:c.definitionProvider
         ~textDocumentSync:
           (Option.value c.textDocumentSync
              ~default:(`TextDocumentSyncKind TextDocumentSyncKind.Full))
