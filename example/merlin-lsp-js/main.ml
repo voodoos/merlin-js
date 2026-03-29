@@ -49,16 +49,18 @@ let _ =
     Document.find_el_by_id G.document (Jstr.v "editor") |> Option.get
   in
   let state =
+    let extensions =
+      [
+        basic_setup;
+        Merlin_codemirror.ocaml;
+        LSPClient.plugin client ~file_uri ~language_id:"ocaml" ();
+      ]
+    in
     State.EditorState.create
       ~config:
         (State.EditorStateConfig.create
            ~doc:"(* Type some OCaml here *)\nlet x = 1\nlet y = x + 2\n"
-           ~extensions:
-             [
-               basic_setup;
-               LSPClient.plugin client ~file_uri ~language_id:"ocaml" ();
-             ]
-           ())
+           ~extensions ())
       ()
   in
   let config = View.EditorViewConfig.create ~state ~parent () in
