@@ -8,6 +8,7 @@ import * as language from "@codemirror/language"
 import { oCaml } from "@codemirror/legacy-modes/mode/mllike"
 import { markdown } from "@codemirror/lang-markdown"
 import { dracula } from 'thememirror';
+import { LSPClient, languageServerExtensions } from "@codemirror/lsp-client"
 
 
 joo_global_object.__CM__view = EditorView;
@@ -28,3 +29,5 @@ joo_global_object.__CM__StateField = StateField;
 joo_global_object.__CM__StateEffect = StateEffect;
 joo_global_object.__CM__keymap = keymap;
 joo_global_object.__CM__theme_dracula = dracula;
+joo_global_object.__CM__LSPClient = LSPClient;
+joo_global_object.__CM__languageServerExtensions = languageServerExtensions;

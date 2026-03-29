@@ -16,6 +16,7 @@
         "@codemirror/autocomplete": "^6.0.0",
         "@codemirror/lang-javascript": "^6.2.2",
         "@codemirror/lang-markdown": "^6.0.0",
+        "@codemirror/lsp-client": "^6.2.2",
         "@codemirror/language": "^6.0.0",
         "@codemirror/legacy-modes": "^6.0.0",
         "@codemirror/lint": "^6.0.0",
