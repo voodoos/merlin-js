@@ -59,7 +59,11 @@ let _ =
     State.EditorState.create
       ~config:
         (State.EditorStateConfig.create
-           ~doc:"(* Type some OCaml here *)\nlet x = 1\nlet y = x + 2\n"
+           ~doc:
+             "(* Type some OCaml here *)\n\n\
+              let x = 1\n\
+              (** X marks the spot *)\n\n\
+              let y = x + 2\n"
            ~extensions ())
       ()
   in
