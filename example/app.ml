@@ -1,4 +1,6 @@
 open Code_mirror
+open State
+open View
 
 module Merlin = Merlin_codemirror.Make (struct
   let worker_url = "workers/merlin_worker.bc.wasm.js"
@@ -9,17 +11,16 @@ end)
 
 let basic_setup = Jv.get Jv.global "__CM__basic_setup" |> Extension.of_jv
 
-let init ?doc ?(exts = [||]) () =
-  let open Editor in
-  let extensions =
-    Array.append [| basic_setup; Merlin_codemirror.ocaml |] exts
+let init ?doc ?(exts = []) () =
+  let extensions = List.append [ basic_setup; Merlin_codemirror.ocaml ] exts in
+  let config = EditorStateConfig.create ?doc ~extensions () in
+  let state = EditorState.create ~config () in
+  let config =
+    EditorViewConfig.create ~state
+      ~parent:(Merlin_codemirror.Utils.get_el_by_id "editor")
+      ()
   in
-  let config = State.Config.create ?doc ~extensions () in
-  let state = State.create ~config () in
-  let opts =
-    View.opts ~state ~parent:(Merlin_codemirror.Utils.get_el_by_id "editor") ()
-  in
-  let view : View.t = View.create ~opts () in
+  let view : EditorView.t = View.EditorView.create ~config () in
   (state, view)
 
 let _editor = init ~exts:Merlin.all_extensions ()

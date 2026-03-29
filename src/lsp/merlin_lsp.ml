@@ -62,6 +62,15 @@ let diagnostic_of_report =
 
 module Server = Linol.Make (Worker_io)
 
+let get_doc ?name source position =
+  let query = Query_protocol.Document (name, position) in
+  try
+    (* TODO: move all these try catch away and use Result.t *)
+    match Merlin_jsoo.dispatch source query with
+    | `Found doc -> Some doc
+    | _ -> None
+  with _ -> None
+
 class merlin_server =
   object (self)
     inherit Server.server
@@ -76,7 +85,11 @@ class merlin_server =
     method! config_hover = Some (`Bool true)
 
     method! config_completion =
-      Some (CompletionOptions.create ~triggerCharacters:[ "." ] ())
+      Some
+        (CompletionOptions.create ~resolveProvider:true
+           ~triggerCharacters:[ "." ] ())
+
+    method! config_definition = Some (`Bool true)
 
     method! config_modify_capabilities c =
       let signatureHelpProvider =
@@ -88,6 +101,8 @@ class merlin_server =
       in
       ServerCapabilities.create ?codeLensProvider:c.codeLensProvider
         ?completionProvider:c.completionProvider ?hoverProvider:c.hoverProvider
+        ~documentHighlightProvider:(`Bool true)
+        ?definitionProvider:c.definitionProvider
         ~textDocumentSync:
           (Option.value c.textDocumentSync
              ~default:(`TextDocumentSyncKind TextDocumentSyncKind.Full))
@@ -124,7 +139,13 @@ class merlin_server =
            match Merlin_jsoo.dispatch source query with
            | [] -> None
            | (loc, `String typ, _) :: _ ->
-               let value = Printf.sprintf "```ocaml\n%s\n```" typ in
+               let doc = get_doc source position in
+               let value =
+                 match doc with
+                 | None -> Printf.sprintf "```ocaml\n%s\n```" typ
+                 | Some doc ->
+                     Printf.sprintf "%s\n***\n```ocaml\n%s\n```" doc typ
+               in
                let contents =
                  MarkupContent.create ~kind:MarkupKind.Markdown ~value
                in
@@ -137,13 +158,40 @@ class merlin_server =
            | _ -> None
          with _ -> None)
 
-    method! on_req_completion ~notify_back:_ ~id:_ ~uri:_ ~pos ~ctx:_
+    method! on_req_definition ~notify_back:_ ~id:_ ~uri ~pos ~workDoneToken:_
+        ~partialResultToken:_ (doc : Server.doc_state) =
+      let source = Msource.make doc.content in
+      let position = lsp_position_to_merlin pos in
+      let query = Query_protocol.Locate (None, `ML, position) in
+      Lwt.return
+        (try
+           match Merlin_jsoo.dispatch source query with
+           | `Found (_, pos) ->
+               let position =
+                 Position.create
+                   ~line:(max 0 (pos.Lexing.pos_lnum - 1))
+                   ~character:(max 0 (pos.pos_cnum - pos.pos_bol))
+               in
+               let range = Range.create ~start:position ~end_:position in
+               Some (`Location [ Location.create ~uri ~range ])
+           | _ -> None
+         with _ -> None)
+
+    method! on_req_completion ~notify_back:_ ~id:_ ~uri ~pos ~ctx:_
         ~workDoneToken:_ ~partialResultToken:_ (doc : Server.doc_state) =
       let source = Msource.make doc.content in
       let position = lsp_position_to_merlin pos in
       let prefix = Merlin_jsoo.Completion.prefix_of_position source position in
       if prefix = "" then Lwt.return None
       else
+        let data =
+          `Assoc
+            [
+              ("uri", DocumentUri.yojson_of_t uri);
+              ("line", `Int pos.line);
+              ("character", `Int pos.character);
+            ]
+        in
         Lwt.return
           (try
              let query =
@@ -156,9 +204,8 @@ class merlin_server =
                List.map completions.entries
                  ~f:(fun (entry : Query_protocol.Compl.entry) ->
                    let kind = completion_kind entry in
-                   (* TODO also return documentation *)
                    CompletionItem.create ~label:entry.name ~kind
-                     ~detail:entry.desc ())
+                     ~detail:entry.desc ~data ())
              in
              let list = CompletionList.create ~isIncomplete:false ~items () in
              Some (`CompletionList list)
@@ -167,6 +214,56 @@ class merlin_server =
     method! on_request_unhandled ~notify_back:_ ~id:_ (type a)
         (r : a Lsp.Client_request.t) : a Lwt.t =
       match r with
+      | Lsp.Client_request.CompletionItemResolve item -> (
+          match item.data with
+          | Some (`Assoc data) -> (
+              let uri = List.assoc "uri" data |> DocumentUri.t_of_yojson in
+              let line = List.assoc "line" data |> Yojson.Safe.Util.to_int in
+              let character =
+                List.assoc "character" data |> Yojson.Safe.Util.to_int
+              in
+              match self#find_doc uri with
+              | None -> Lwt.return item
+              | Some doc ->
+                  let source = Msource.make doc.content in
+                  let position = `Logical (line + 1, character) in
+                  let name = item.label in
+                  Lwt.return
+                    (try
+                       match get_doc ~name source position with
+                       | Some doc_str ->
+                           let documentation =
+                             `MarkupContent
+                               (MarkupContent.create ~kind:MarkupKind.Markdown
+                                  ~value:doc_str)
+                           in
+                           { item with documentation = Some documentation }
+                       | None -> item
+                     with _ -> item))
+          | _ -> Lwt.return item)
+      | Lsp.Client_request.TextDocumentHighlight params -> (
+          let uri = params.textDocument.uri in
+          match self#find_doc uri with
+          | None -> Lwt.return None
+          | Some doc ->
+              let source = Msource.make doc.content in
+              let position = lsp_position_to_merlin params.position in
+              let query =
+                Query_protocol.Occurrences (`Ident_at position, `Buffer)
+              in
+              Lwt.return
+                (try
+                   let occurrences, _status =
+                     Merlin_jsoo.dispatch source query
+                   in
+                   let highlights =
+                     List.map occurrences
+                       ~f:(fun (occ : Query_protocol.occurrence) ->
+                         DocumentHighlight.create ~range:(loc_to_range occ.loc)
+                           ~kind:DocumentHighlightKind.Read ())
+                   in
+                   Some highlights
+                 with _ -> None))
       | Lsp.Client_request.SignatureHelp params -> (
           let uri = params.textDocument.uri in
           let empty = SignatureHelp.create ~signatures:[] () in

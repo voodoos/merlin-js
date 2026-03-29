@@ -3,7 +3,7 @@
  (preprocess
   (pps js_of_ocaml-ppx))
  (js_of_ocaml
-  (javascript_files thread_stubs.js))
+  (javascript_files thread_stubs.js merlin_stubs.js))
  (libraries
   linol
   lwt

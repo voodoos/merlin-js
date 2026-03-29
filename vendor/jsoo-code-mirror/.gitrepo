@@ -1,0 +1,12 @@
+; DO NOT EDIT (unless you know what you are doing)
+;
+; This subdirectory is a git "subrepo", and this file is maintained by the
+; git-subrepo command. See https://github.com/ingydotnet/git-subrepo#readme
+;
+[subrepo]
+	remote = git@github.com:voodoos/jsoo-code-mirror.git
+	branch = main
+	commit = 416b964f7348604a7c4586e350d237632ef1dc2a
+	parent = 1dfd44f475c956efeaff7e04b062175bae7c99f0
+	method = merge
+	cmdver = 0.4.5
