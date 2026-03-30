@@ -24,3 +24,8 @@ dune-workspace
 node_modules
 index.js
 merlin-lsp.js
+
+# Stdlib in examples We cannot use sub .gitignore files because it messes up
+# with the upload to gh-pages
+example/workers/stdlib/*
+example/workers/stdlib/!dune
