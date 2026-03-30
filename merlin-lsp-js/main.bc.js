@@ -11235,7 +11235,7 @@ o=new
 l.Array(0),g=0,c=vZ;for(;;){if(!c)break;var
 v=c[2];o[g]=bx(c[1]);g=g+1|0;c=v}var
 u=new
-l.Array(0),f=[0,{url:"/example/workers/stdlib/",toplevelModules:o},0],n=0;for(;;){if(!f)break;var
+l.Array(0),f=[0,{url:"/workers/stdlib/",toplevelModules:o},0],n=0;for(;;){if(!f)break;var
 z=f[2];u[n]=f[1];f=z;n=n+1|0}fs.notification("merlin/addCmis",{dynamicCmis:u});var
 q=fh.getElementById("editor"),r=iU(q)?0:[0,q],w=r?r[1]:t("option is None"),x=[0,vX,[0,qI,[0,vW,[0,fs.plugin("file:///workspace/main.ml",bx(v0[1])),0]]]],d={};d.doc=bx(v1[1]);ao(d,"selection",0);var
 s=new
