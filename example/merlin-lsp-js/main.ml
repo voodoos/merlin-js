@@ -40,7 +40,7 @@ let _ =
     let cmi =
       Jv.obj
         [|
-          ("url", Jv.of_string "workers/stdlib/");
+          ("url", Jv.of_string "stdlib/");
           ("toplevelModules", Jv.of_list Jv.of_string [ "Stdlib" ]);
         |]
     in
